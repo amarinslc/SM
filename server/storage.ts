@@ -1,8 +1,11 @@
 import session from "express-session";
-import createMemoryStore from "memorystore";
-import { InsertUser, User, Post, Comment } from "@shared/schema";
+import { db } from "./db";
+import { InsertUser, User, Post, Comment, users, follows, posts, comments } from "@shared/schema";
+import { eq, and, inArray, or } from "drizzle-orm";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -21,57 +24,34 @@ export interface IStorage {
   getComments(postId: number): Promise<Comment[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private follows: Map<number, Set<number>>;
-  private posts: Map<number, Post>;
-  private comments: Map<number, Comment[]>;
-  private currentUserId: number;
-  private currentPostId: number;
-  private currentCommentId: number;
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.follows = new Map();
-    this.posts = new Map();
-    this.comments = new Map();
-    this.currentUserId = 1;
-    this.currentPostId = 1;
-    this.currentCommentId = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
     });
   }
 
-  async searchUsers(query: string): Promise<User[]> {
-    const lowercaseQuery = query.toLowerCase();
-    return Array.from(this.users.values()).filter(user =>
-      user.username.toLowerCase().includes(lowercaseQuery)
-    );
-  }
-
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = {
-      ...insertUser,
-      id,
-      followerCount: 0,
-      followingCount: 0,
-    };
-    this.users.set(id, user);
-    this.follows.set(id, new Set());
-    return user;
+  async searchUsers(query: string): Promise<User[]> {
+    // This will search all users, regardless of following status
+    return db.select().from(users).where(eq(users.username, query));
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
   }
 
   async followUser(followerId: number, followingId: number): Promise<void> {
@@ -79,122 +59,172 @@ export class MemStorage implements IStorage {
       throw new Error("Cannot follow yourself");
     }
 
-    const follower = await this.getUser(followerId);
-    const following = await this.getUser(followingId);
-    if (!follower || !following) throw new Error("User not found");
+    // Check if already following
+    const [existing] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
+        )
+      );
 
-    const followerFollowing = this.follows.get(followerId);
-    if (!followerFollowing) throw new Error("Follower not found");
-
-    if (followerFollowing.size >= 200) {
-      throw new Error("You can only follow up to 200 users");
+    if (existing) {
+      throw new Error("Already following this user");
     }
 
-    followerFollowing.add(followingId);
-    this.users.set(followerId, {
-      ...follower,
-      followingCount: follower.followingCount + 1,
-    });
-    this.users.set(followingId, {
-      ...following,
-      followerCount: following.followerCount + 1,
+    // Start a transaction to ensure consistency
+    await db.transaction(async (tx) => {
+      // Create follow relationship
+      await tx.insert(follows).values({
+        followerId,
+        followingId,
+      });
+
+      // Update follower count
+      await tx
+        .update(users)
+        .set({ followingCount: users.followingCount + 1 })
+        .where(eq(users.id, followerId));
+
+      // Update following count
+      await tx
+        .update(users)
+        .set({ followerCount: users.followerCount + 1 })
+        .where(eq(users.id, followingId));
     });
   }
 
   async unfollowUser(followerId: number, followingId: number): Promise<void> {
-    const follower = await this.getUser(followerId);
-    const following = await this.getUser(followingId);
-    if (!follower || !following) throw new Error("User not found");
+    await db.transaction(async (tx) => {
+      // Remove follow relationship
+      await tx
+        .delete(follows)
+        .where(
+          and(
+            eq(follows.followerId, followerId),
+            eq(follows.followingId, followingId)
+          )
+        );
 
-    const followerFollowing = this.follows.get(followerId);
-    if (!followerFollowing) throw new Error("Follower not found");
+      // Update follower count
+      await tx
+        .update(users)
+        .set({ followingCount: users.followingCount - 1 })
+        .where(eq(users.id, followerId));
 
-    followerFollowing.delete(followingId);
-    this.users.set(followerId, {
-      ...follower,
-      followingCount: follower.followingCount - 1,
-    });
-    this.users.set(followingId, {
-      ...following,
-      followerCount: following.followerCount - 1,
+      // Update following count
+      await tx
+        .update(users)
+        .set({ followerCount: users.followerCount - 1 })
+        .where(eq(users.id, followingId));
     });
   }
 
   async getFollowers(userId: number): Promise<User[]> {
-    const users = Array.from(this.follows.entries())
-      .filter(([_, following]) => following.has(userId))
-      .map(([id]) => this.users.get(id))
-      .filter((user): user is User => user !== undefined);
-    return users;
+    const followData = await db
+      .select({
+        follower: users,
+      })
+      .from(follows)
+      .where(eq(follows.followingId, userId))
+      .innerJoin(users, eq(users.id, follows.followerId));
+
+    return followData.map((d) => d.follower);
   }
 
   async getFollowing(userId: number): Promise<User[]> {
-    const following = this.follows.get(userId);
-    if (!following) return [];
-    return Array.from(following)
-      .map((id) => this.users.get(id))
-      .filter((user): user is User => user !== undefined);
-  }
-
-  async getFeed(userId: number): Promise<Post[]> {
-    const following = this.follows.get(userId);
-    const feed = Array.from(this.posts.values())
-      .filter((post) => {
-        const isOwnPost = post.userId === userId;
-        const isFollowingPost = following?.has(post.userId) ?? false;
-        return isOwnPost || isFollowingPost;
+    const followData = await db
+      .select({
+        following: users,
       })
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-    return feed;
+      .from(follows)
+      .where(eq(follows.followerId, userId))
+      .innerJoin(users, eq(users.id, follows.followingId));
+
+    return followData.map((d) => d.following);
   }
 
   async createPost(userId: number, content: string, media: any[]): Promise<Post> {
-    const post: Post = {
-      id: this.currentPostId++,
-      userId,
-      content,
-      media,
-      createdAt: new Date(),
-    };
-    this.posts.set(post.id, post);
+    const [post] = await db
+      .insert(posts)
+      .values({
+        userId,
+        content,
+        media,
+      })
+      .returning();
     return post;
   }
 
   async getPosts(userId: number): Promise<Post[]> {
-    return Array.from(this.posts.values())
-      .filter((post) => post.userId === userId)
-      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    return db
+      .select()
+      .from(posts)
+      .where(eq(posts.userId, userId))
+      .orderBy(posts.createdAt);
+  }
+
+  async getFeed(userId: number): Promise<Post[]> {
+    // Get users that the current user follows
+    const following = await this.getFollowing(userId);
+    const followingIds = following.map((u) => u.id);
+
+    // Get posts from followed users and own posts
+    return db
+      .select()
+      .from(posts)
+      .where(
+        or(
+          eq(posts.userId, userId),
+          inArray(posts.userId, followingIds)
+        )
+      )
+      .orderBy(posts.createdAt);
   }
 
   async createComment(postId: number, userId: number, content: string): Promise<Comment> {
-    const post = Array.from(this.posts.values()).find(p => p.id === postId);
-    if (!post) throw new Error("Post not found");
+    // Check if user can comment (follows the post author or is the author)
+    const post = await db.select().from(posts).where(eq(posts.id, postId)).limit(1);
+    if (!post.length) throw new Error("Post not found");
 
-    const following = this.follows.get(userId);
-    const canComment = post.userId === userId || following?.has(post.userId);
-
+    const canComment = post[0].userId === userId || await this.isFollowing(userId, post[0].userId);
     if (!canComment) {
       throw new Error("You can only comment on your own posts or posts from users you follow");
     }
 
-    const comment: Comment = {
-      id: this.currentCommentId++,
-      postId,
-      userId,
-      content,
-      createdAt: new Date(),
-    };
-
-    const postComments = this.comments.get(postId) || [];
-    postComments.push(comment);
-    this.comments.set(postId, postComments);
-
+    const [comment] = await db
+      .insert(comments)
+      .values({
+        postId,
+        userId,
+        content,
+      })
+      .returning();
     return comment;
   }
 
   async getComments(postId: number): Promise<Comment[]> {
-    return this.comments.get(postId) || [];
+    return db
+      .select()
+      .from(comments)
+      .where(eq(comments.postId, postId))
+      .orderBy(comments.createdAt);
+  }
+
+  private async isFollowing(followerId: number, followingId: number): Promise<boolean> {
+    const [follow] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
+        )
+      );
+    return !!follow;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
