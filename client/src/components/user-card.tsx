@@ -43,8 +43,8 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     <Card>
       <CardHeader className="flex-row items-center gap-4">
         <Avatar className="h-12 w-12">
-          <AvatarImage src={user.avatar} />
-          <AvatarFallback>{user.name[0]}</AvatarFallback>
+          <AvatarImage src={user.avatar || undefined} />
+          <AvatarFallback>{(user.name || "?")[0].toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
           <span className="font-semibold">{user.name}</span>
@@ -52,14 +52,14 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground mb-4">{user.bio}</p>
+        <p className="text-sm text-muted-foreground mb-4">{user.bio || "No bio available"}</p>
         <div className="flex gap-4">
           <div>
-            <span className="font-semibold">{user.followerCount}</span>
+            <span className="font-semibold">{user.followerCount || 0}</span>
             <span className="text-sm text-muted-foreground ml-1">followers</span>
           </div>
           <div>
-            <span className="font-semibold">{user.followingCount}</span>
+            <span className="font-semibold">{user.followingCount || 0}</span>
             <span className="text-sm text-muted-foreground ml-1">following</span>
           </div>
         </div>

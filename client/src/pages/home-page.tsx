@@ -23,7 +23,7 @@ export default function HomePage() {
   });
 
   const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
-    queryKey: ["/api/users/search", searchQuery],
+    queryKey: ["/api/users/search", { q: searchQuery }],
     enabled: searchQuery.length > 0,
   });
 
