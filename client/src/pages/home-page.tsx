@@ -30,7 +30,7 @@ export default function HomePage() {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Search failed');
-      return res.json();
+      return await res.json();
     },
     enabled: searchQuery.length > 0,
   });
@@ -39,6 +39,7 @@ export default function HomePage() {
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
+    console.log('Search query:', value);
     setSearchQuery(value);
   };
 

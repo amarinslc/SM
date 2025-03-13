@@ -167,18 +167,18 @@ export class MemStorage implements IStorage {
 
     const lowercaseQuery = query.toLowerCase();
     const allUsers = Array.from(this.users.values());
-    console.log('All available users:', allUsers.map(u => u.username));
+    console.log('All available users:', allUsers.map(u => ({ username: u.username, id: u.id })));
 
     const results = allUsers.filter((user) => {
       const matchesName = user.name.toLowerCase().includes(lowercaseQuery);
       const matchesUsername = user.username.toLowerCase().includes(lowercaseQuery);
       const matches = matchesName || matchesUsername;
-      console.log(`User ${user.username} matches: ${matches}`);
+      console.log(`User ${user.username} (ID: ${user.id}) matches: ${matches}`);
       return matches;
     });
 
     console.log(`Found ${results.length} matching users:`, results.map(u => u.username));
-    return results;
+    return results.filter(user => user !== undefined);
   }
 }
 
