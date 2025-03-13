@@ -1,7 +1,7 @@
 import session from "express-session";
 import { db } from "./db";
 import { InsertUser, User, Post, Comment, users, follows, posts, comments } from "@shared/schema";
-import { eq, and, inArray, or } from "drizzle-orm";
+import { eq, and, inArray, or, sql } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 
@@ -45,8 +45,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    // This will search all users, regardless of following status
-    return db.select().from(users).where(eq(users.username, query));
+    // This will search all users with case-insensitive partial matches
+    return db.select().from(users).where(
+      or(
+        sql`lower(${users.username}) like ${`%${query.toLowerCase()}%`}`,
+        sql`lower(${users.name}) like ${`%${query.toLowerCase()}%`}`
+      )
+    );
   }
 
   async createUser(user: InsertUser): Promise<User> {
