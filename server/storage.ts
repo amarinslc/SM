@@ -53,18 +53,26 @@ export class MemStorage implements IStorage {
     });
   }
 
+  async searchUsers(query: string): Promise<User[]> {
+    console.log(`Searching users with query: "${query}"`);
+    const allUsers = Array.from(this.users.values());
+    console.log(`Current users in storage: ${allUsers.length}`);
+    console.log('All users:', allUsers.map(u => ({ id: u.id, username: u.username })));
+
+    //No filtering for search
+    return allUsers;
+  }
+
   async getUser(id: number): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     console.log(`Looking up user by username: ${username}`);
-    console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
     const users = Array.from(this.users.values());
+    console.log(`Current users in storage: ${users.length}`);
     console.log('All users:', users.map(u => u.username));
-    const user = users.find(
-      (user) => user.username === username,
-    );
+    const user = users.find((user) => user.username === username);
     console.log(`User found:`, user ? 'yes' : 'no');
     return user;
   }
@@ -74,7 +82,7 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
-      isPrivate: true, // All accounts are private by default
+      isPrivate: true,
       followerCount: 0,
       followingCount: 0,
     };
@@ -161,7 +169,7 @@ export class MemStorage implements IStorage {
       throw new Error("You can only follow up to 200 users");
     }
 
-    if (following.isPrivate && following.followerCount >= 200) {
+    if (following.followerCount >= 200) {
       throw new Error("User has reached maximum followers");
     }
 
@@ -211,6 +219,25 @@ export class MemStorage implements IStorage {
       .filter((user): user is User => user !== undefined);
   }
 
+  async getFeed(userId: number): Promise<Post[]> {
+    console.log(`Getting feed for user ${userId}`);
+    const following = this.follows.get(userId);
+
+    // By default, only show user's own posts
+    let feedPosts = Array.from(this.posts.values())
+      .filter(post => post.userId === userId);
+
+    // If user follows others, add their posts too
+    if (following && following.size > 0) {
+      const followedPosts = Array.from(this.posts.values())
+        .filter(post => following.has(post.userId));
+      feedPosts = [...feedPosts, ...followedPosts];
+    }
+
+    // Sort by date
+    return feedPosts.sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+  }
+
   async createPost(userId: number, content: string, media: any[]): Promise<Post> {
     const user = await this.getUser(userId);
     if (!user) throw new Error("User not found");
@@ -229,52 +256,7 @@ export class MemStorage implements IStorage {
   async getPosts(userId: number): Promise<Post[]> {
     return Array.from(this.posts.values())
       .filter((post) => post.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  }
-
-  async getFeed(userId: number): Promise<Post[]> {
-    console.log(`Getting feed for user ${userId}`);
-    const following = this.follows.get(userId);
-    if (!following) {
-      console.log('No following set found, returning only own posts');
-      // Return only user's own posts if not following anyone
-      return Array.from(this.posts.values())
-        .filter(post => post.userId === userId)
-        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-    }
-
-    console.log(`User follows ${following.size} accounts:`, Array.from(following));
-    const feed = Array.from(this.posts.values())
-      .filter((post) => {
-        const isFollowing = following.has(post.userId);
-        const isOwnPost = post.userId === userId;
-        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}`);
-        // Only show posts from followed users or own posts
-        return isFollowing || isOwnPost;
-      })
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
-
-    console.log(`Returning ${feed.length} posts in feed`);
-    return feed;
-  }
-
-  async searchUsers(query: string): Promise<User[]> {
-    console.log(`Searching users with query: "${query}"`);
-    const allUsers = Array.from(this.users.values());
-    console.log(`Current users in storage: ${allUsers.length}`);
-    console.log('All users:', allUsers.map(u => ({ id: u.id, username: u.username })));
-
-    const lowercaseQuery = query.toLowerCase();
-    const results = allUsers.filter((user) => {
-      const matchesName = user.name.toLowerCase().includes(lowercaseQuery);
-      const matchesUsername = user.username.toLowerCase().includes(lowercaseQuery);
-      const matches = matchesName || matchesUsername;
-      console.log(`User ${user.username} (ID: ${user.id}) matches: ${matches}`);
-      return matches;
-    });
-
-    console.log(`Found ${results.length} matching users:`, results.map(u => u.username));
-    return results;
   }
 
   async canComment(userId: number, postId: number): Promise<boolean> {
@@ -284,15 +266,14 @@ export class MemStorage implements IStorage {
     // Users can always comment on their own posts
     if (post.userId === userId) return true;
 
-    // Check if the user follows the post creator or the post is public
+    // Check if the user follows the post creator
     const following = this.follows.get(userId);
-    const postAuthor = this.users.get(post.userId);
-    return following ? following.has(post.userId) || !postAuthor?.isPrivate : !postAuthor?.isPrivate;
+    return following ? following.has(post.userId) : false;
   }
 
   async createComment(postId: number, userId: number, content: string): Promise<Comment> {
     if (!await this.canComment(userId, postId)) {
-      throw new Error("You can only comment on posts from users you follow or public posts.");
+      throw new Error("You can only comment on posts from users you follow");
     }
 
     const comment: Comment = {
