@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   bio: text("bio"),
   avatar: text("avatar"),
+  isPrivate: boolean("is_private").default(true).notNull(),
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
 });
@@ -17,6 +18,13 @@ export const users = pgTable("users", {
 export const follows = pgTable("follows", {
   followerId: integer("follower_id").notNull(),
   followingId: integer("following_id").notNull(),
+});
+
+export const followRequests = pgTable("follow_requests", {
+  id: serial("id").primaryKey(),
+  requesterId: integer("requester_id").notNull(),
+  targetId: integer("target_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const posts = pgTable("posts", {
@@ -61,3 +69,4 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type FollowRequest = typeof followRequests.$inferSelect;

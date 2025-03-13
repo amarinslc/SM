@@ -1,6 +1,6 @@
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { InsertUser, User, Post, Comment } from "@shared/schema";
+import { InsertUser, User, Post, Comment, FollowRequest } from "@shared/schema";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -10,6 +10,10 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   followUser(followerId: number, followingId: number): Promise<void>;
   unfollowUser(followerId: number, followingId: number): Promise<void>;
+  requestFollow(requesterId: number, targetId: number): Promise<FollowRequest>;
+  getPendingFollowRequests(userId: number): Promise<FollowRequest[]>;
+  acceptFollowRequest(requestId: number): Promise<void>;
+  rejectFollowRequest(requestId: number): Promise<void>;
   getFollowers(userId: number): Promise<User[]>;
   getFollowing(userId: number): Promise<User[]>;
   createPost(userId: number, content: string, media: any[]): Promise<Post>;
@@ -17,7 +21,6 @@ export interface IStorage {
   getFeed(userId: number): Promise<Post[]>;
   sessionStore: session.Store;
   searchUsers(query: string): Promise<User[]>;
-  // Add comment methods
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
   canComment(userId: number, postId: number): Promise<boolean>;
@@ -26,21 +29,25 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private follows: Map<number, Set<number>>;
+  private followRequests: Map<number, FollowRequest>;
   private posts: Map<number, Post>;
   private comments: Map<number, Comment[]>;
   private currentUserId: number;
   private currentPostId: number;
   private currentCommentId: number;
+  private currentRequestId: number;
   sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
     this.follows = new Map();
+    this.followRequests = new Map();
     this.posts = new Map();
     this.comments = new Map();
     this.currentUserId = 1;
     this.currentPostId = 1;
     this.currentCommentId = 1;
+    this.currentRequestId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
@@ -67,6 +74,7 @@ export class MemStorage implements IStorage {
     const user: User = {
       ...insertUser,
       id,
+      isPrivate: true, // All accounts are private by default
       followerCount: 0,
       followingCount: 0,
     };
@@ -76,9 +84,69 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async followUser(followerId: number, followingId: number): Promise<void> {
-    if (followerId === followingId) throw new Error("Cannot follow yourself");
+  async requestFollow(requesterId: number, targetId: number): Promise<FollowRequest> {
+    const requester = await this.getUser(requesterId);
+    const target = await this.getUser(targetId);
 
+    if (!requester || !target) {
+      throw new Error("User not found");
+    }
+
+    if (requesterId === targetId) {
+      throw new Error("Cannot follow yourself");
+    }
+
+    // Check if already following
+    const following = this.follows.get(requesterId);
+    if (following?.has(targetId)) {
+      throw new Error("Already following this user");
+    }
+
+    // Check if request already exists
+    const existingRequest = Array.from(this.followRequests.values()).find(
+      (req) => req.requesterId === requesterId && req.targetId === targetId
+    );
+    if (existingRequest) {
+      throw new Error("Follow request already sent");
+    }
+
+    const request: FollowRequest = {
+      id: this.currentRequestId++,
+      requesterId,
+      targetId,
+      createdAt: new Date(),
+    };
+
+    this.followRequests.set(request.id, request);
+    return request;
+  }
+
+  async getPendingFollowRequests(userId: number): Promise<FollowRequest[]> {
+    return Array.from(this.followRequests.values()).filter(
+      (req) => req.targetId === userId
+    );
+  }
+
+  async acceptFollowRequest(requestId: number): Promise<void> {
+    const request = this.followRequests.get(requestId);
+    if (!request) {
+      throw new Error("Follow request not found");
+    }
+
+    await this.followUser(request.requesterId, request.targetId);
+    this.followRequests.delete(requestId);
+  }
+
+  async rejectFollowRequest(requestId: number): Promise<void> {
+    const request = this.followRequests.get(requestId);
+    if (!request) {
+      throw new Error("Follow request not found");
+    }
+
+    this.followRequests.delete(requestId);
+  }
+
+  async followUser(followerId: number, followingId: number): Promise<void> {
     const follower = await this.getUser(followerId);
     const following = await this.getUser(followingId);
     if (!follower || !following) throw new Error("User not found");
@@ -90,18 +158,18 @@ export class MemStorage implements IStorage {
       throw new Error("You can only follow up to 200 users");
     }
 
-    if (follower.followerCount >= 200) {
+    if (following.isPrivate && following.followerCount >= 200) {
       throw new Error("User has reached maximum followers");
     }
 
     followerFollowing.add(followingId);
     this.users.set(followerId, {
       ...follower,
-      followingCount: follower.followingCount + 1,
+      followingCount: (follower.followingCount || 0) + 1,
     });
     this.users.set(followingId, {
       ...following,
-      followerCount: following.followerCount + 1,
+      followerCount: (following.followerCount || 0) + 1,
     });
   }
 
@@ -116,11 +184,11 @@ export class MemStorage implements IStorage {
     followerFollowing.delete(followingId);
     this.users.set(followerId, {
       ...follower,
-      followingCount: follower.followingCount - 1,
+      followingCount: (follower.followingCount || 0) - 1,
     });
     this.users.set(followingId, {
       ...following,
-      followerCount: following.followerCount - 1,
+      followerCount: (following.followerCount || 0) - 1,
     });
   }
 
@@ -174,8 +242,9 @@ export class MemStorage implements IStorage {
       .filter((post) => {
         const isFollowing = following.has(post.userId);
         const isOwnPost = post.userId === userId;
-        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}`);
-        return isFollowing || isOwnPost;
+        const user = this.users.get(post.userId);
+        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}, isPrivate=${user?.isPrivate}`);
+        return isFollowing || isOwnPost || !user?.isPrivate; //Added this line to include public posts
       })
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 
@@ -209,14 +278,15 @@ export class MemStorage implements IStorage {
     // Users can always comment on their own posts
     if (post.userId === userId) return true;
 
-    // Check if the user follows the post creator
+    // Check if the user follows the post creator or the post is public
     const following = this.follows.get(userId);
-    return following ? following.has(post.userId) : false;
+    const postAuthor = this.users.get(post.userId);
+    return following ? following.has(post.userId) || !postAuthor?.isPrivate : !postAuthor?.isPrivate;
   }
 
   async createComment(postId: number, userId: number, content: string): Promise<Comment> {
     if (!await this.canComment(userId, postId)) {
-      throw new Error("You can only comment on posts from users you follow");
+      throw new Error("You can only comment on posts from users you follow or public posts.");
     }
 
     const comment: Comment = {

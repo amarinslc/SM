@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -16,6 +16,15 @@ interface UserCardProps {
 export function UserCard({ user, isFollowing }: UserCardProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
+
+  const { data: followRequests } = useQuery({
+    queryKey: ["/api/users/requests"],
+    enabled: currentUser?.id === user.id,
+  });
+
+  const hasPendingRequest = followRequests?.some(
+    (req) => req.targetId === user.id && req.requesterId === currentUser?.id
+  );
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -31,9 +40,11 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       toast({
-        title: isFollowing ? "Unfollowed" : "Following",
+        title: isFollowing ? "Unfollowed" : user.isPrivate ? "Request sent" : "Following",
         description: isFollowing
           ? `You unfollowed ${user.name}`
+          : user.isPrivate
+          ? `Follow request sent to ${user.name}`
           : `You are now following ${user.name}`,
       });
     },
@@ -42,6 +53,32 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
         title: "Action failed",
         description: error.message,
         variant: "destructive",
+      });
+    },
+  });
+
+  const acceptRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      await apiRequest("POST", `/api/users/requests/${requestId}/accept`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/followers`] });
+      toast({
+        title: "Follow request accepted",
+        description: "User can now see your posts",
+      });
+    },
+  });
+
+  const rejectRequestMutation = useMutation({
+    mutationFn: async (requestId: number) => {
+      await apiRequest("POST", `/api/users/requests/${requestId}/reject`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/requests"] });
+      toast({
+        title: "Follow request rejected",
       });
     },
   });
@@ -75,16 +112,45 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
             variant={isFollowing ? "outline" : "default"}
             className="w-full mt-4"
             onClick={() => followMutation.mutate()}
-            disabled={followMutation.isPending}
+            disabled={followMutation.isPending || hasPendingRequest}
           >
             {followMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
+            ) : hasPendingRequest ? (
+              "Request Pending"
             ) : isFollowing ? (
               "Unfollow"
             ) : (
               "Follow"
             )}
           </Button>
+        )}
+        {currentUser?.id === user.id && followRequests && followRequests.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <h3 className="font-semibold">Follow Requests</h3>
+            {followRequests.map((request) => (
+              <div key={request.id} className="flex items-center justify-between">
+                <span className="text-sm">@{request.requesterId}</span>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => acceptRequestMutation.mutate(request.id)}
+                    disabled={acceptRequestMutation.isPending}
+                  >
+                    Accept
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => rejectRequestMutation.mutate(request.id)}
+                    disabled={rejectRequestMutation.isPending}
+                  >
+                    Reject
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

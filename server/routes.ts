@@ -62,8 +62,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:id/follow", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      await storage.followUser(req.user!.id, parseInt(req.params.id));
-      res.sendStatus(200);
+      const targetUser = await storage.getUser(parseInt(req.params.id));
+      if (!targetUser) {
+        return res.status(404).send("User not found");
+      }
+
+      if (targetUser.isPrivate) {
+        const request = await storage.requestFollow(req.user!.id, parseInt(req.params.id));
+        res.status(201).json(request);
+      } else {
+        await storage.followUser(req.user!.id, parseInt(req.params.id));
+        res.sendStatus(200);
+      }
     } catch (error) {
       res.status(400).send((error as Error).message);
     }
@@ -88,6 +98,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const following = await storage.getFollowing(parseInt(req.params.id));
     res.json(following);
   });
+
+  app.get("/api/users/requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const requests = await storage.getPendingFollowRequests(req.user!.id);
+    res.json(requests);
+  });
+
+  app.post("/api/users/requests/:id/accept", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.acceptFollowRequest(parseInt(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(400).send((error as Error).message);
+    }
+  });
+
+  app.post("/api/users/requests/:id/reject", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.rejectFollowRequest(parseInt(req.params.id));
+      res.sendStatus(200);
+    } catch (error) {
+      res.status(400).send((error as Error).message);
+    }
+  });
+
 
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
