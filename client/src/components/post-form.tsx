@@ -25,7 +25,7 @@ export function PostForm() {
       const formData = new FormData();
       formData.append("content", content);
       media.forEach((item, index) => {
-        formData.append(`media_${index}`, item.file);
+        formData.append("media", item.file); // Changed to just "media" to match multer config
       });
 
       const res = await fetch("/api/posts", {
@@ -35,7 +35,8 @@ export function PostForm() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to create post");
+        const error = await res.text();
+        throw new Error(error || "Failed to create post");
       }
 
       return res.json();

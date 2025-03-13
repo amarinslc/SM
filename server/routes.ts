@@ -8,6 +8,14 @@ import path from "path";
 import fs from "fs/promises";
 import express from 'express';
 
+// Ensure uploads directory exists with proper permissions
+const uploadsDir = path.join(process.cwd(), 'uploads');
+try {
+  await fs.access(uploadsDir);
+} catch {
+  await fs.mkdir(uploadsDir, { recursive: true });
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -24,14 +32,6 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
-
-  // Ensure uploads directory exists
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  try {
-    await fs.access(uploadsDir);
-  } catch {
-    await fs.mkdir(uploadsDir, { recursive: true });
-  }
 
   // Search endpoint should be before dynamic routes to avoid conflicts
   app.get("/api/users/search", async (req, res) => {
@@ -93,15 +93,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
+      console.log('Received post creation request:', {
+        body: req.body,
+        files: req.files ? (req.files as Express.Multer.File[]).length : 0
+      });
+
       const files = req.files as Express.Multer.File[] | undefined;
       const media = [];
 
       if (files && files.length > 0) {
         for (const file of files) {
+          console.log('Processing file:', file.originalname);
           const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
           const filePath = path.join('uploads', filename);
 
-          await fs.writeFile(filePath, file.buffer);
+          await fs.writeFile(path.join(process.cwd(), filePath), file.buffer);
           media.push({
             type: 'image',
             url: `/uploads/${filename}`
@@ -115,10 +121,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         media
       );
 
+      console.log('Post created successfully:', post);
       res.status(201).json(post);
     } catch (error) {
       console.error('Error creating post:', error);
-      res.status(400).json({ error: (error as Error).message });
+      res.status(400).send((error as Error).message);
     }
   });
 
