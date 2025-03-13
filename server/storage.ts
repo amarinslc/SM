@@ -236,8 +236,11 @@ export class MemStorage implements IStorage {
     console.log(`Getting feed for user ${userId}`);
     const following = this.follows.get(userId);
     if (!following) {
-      console.log('No following set found, returning empty feed');
-      return [];
+      console.log('No following set found, returning only own posts');
+      // Return only user's own posts if not following anyone
+      return Array.from(this.posts.values())
+        .filter(post => post.userId === userId)
+        .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
     }
 
     console.log(`User follows ${following.size} accounts:`, Array.from(following));
