@@ -29,6 +29,13 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       queryClient.invalidateQueries({
         queryKey: [`/api/users/${currentUser?.id}/following`],
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      toast({
+        title: isFollowing ? "Unfollowed" : "Following",
+        description: isFollowing
+          ? `You unfollowed ${user.name}`
+          : `You are now following ${user.name}`,
+      });
     },
     onError: (error: Error) => {
       toast({

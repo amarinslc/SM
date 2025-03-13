@@ -7,6 +7,15 @@ import { insertPostSchema } from "@shared/schema";
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Search endpoint should be before dynamic routes to avoid conflicts
+  app.get("/api/users/search", async (req, res) => {
+    const query = req.query.q?.toString().toLowerCase() || "";
+    if (!query) return res.json([]);
+
+    const users = await storage.searchUsers(query);
+    res.json(users);
+  });
+
   app.get("/api/users/:id", async (req, res) => {
     const user = await storage.getUser(parseInt(req.params.id));
     if (!user) return res.status(404).send("User not found");
@@ -66,14 +75,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const posts = await storage.getFeed(req.user!.id);
     res.json(posts);
-  });
-
-  app.get("/api/users/search", async (req, res) => {
-    const query = req.query.q?.toString().toLowerCase() || "";
-    if (!query) return res.json([]);
-
-    const users = await storage.searchUsers(query);
-    res.json(users);
   });
 
   const httpServer = createServer(app);

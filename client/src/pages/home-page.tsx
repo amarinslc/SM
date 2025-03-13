@@ -67,12 +67,11 @@ export default function HomePage() {
             ) : searchResults?.length ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {searchResults.map((searchedUser) => (
-                  <Link key={searchedUser.id} href={`/profile/${searchedUser.id}`}>
-                    <UserCard
-                      user={searchedUser}
-                      isFollowing={following?.some((f) => f.id === searchedUser.id) ?? false}
-                    />
-                  </Link>
+                  <UserCard
+                    key={searchedUser.id}
+                    user={searchedUser}
+                    isFollowing={following?.some((f) => f.id === searchedUser.id) ?? false}
+                  />
                 ))}
               </div>
             ) : (
@@ -115,12 +114,11 @@ export default function HomePage() {
                 </div>
               ) : (
                 following?.map((followedUser) => (
-                  <Link key={followedUser.id} href={`/profile/${followedUser.id}`}>
-                    <UserCard
-                      user={followedUser}
-                      isFollowing={true}
-                    />
-                  </Link>
+                  <UserCard
+                    key={followedUser.id}
+                    user={followedUser}
+                    isFollowing={true}
+                  />
                 ))
               )}
             </div>
