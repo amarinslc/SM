@@ -7,7 +7,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import {useEffect} from 'react';
 
 interface UserCardProps {
   user: User;
@@ -19,13 +18,9 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   const { toast } = useToast();
 
   const { data: followRequests } = useQuery({
-    queryKey: ["/api/users/requests"],
+    queryKey: [`/api/users/${user.id}/requests`],
     enabled: currentUser?.id === user.id,
   });
-
-  useEffect(() => {
-    console.log('Follow requests:', followRequests);
-  }, [followRequests]);
 
   const hasPendingRequest = followRequests?.some(
     (req) => req.targetId === user.id && req.requesterId === currentUser?.id
@@ -33,10 +28,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
 
   const followMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest(
-        "POST",
-        `/api/users/${user.id}/${isFollowing ? "unfollow" : "follow"}`,
-      );
+      await apiRequest("POST", `/api/users/${user.id}/${isFollowing ? "unfollow" : "follow"}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
@@ -67,7 +59,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       await apiRequest("POST", `/api/users/requests/${requestId}/accept`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}/requests`] });
       queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/followers`] });
       toast({
         title: "Follow request accepted",
@@ -81,7 +73,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       await apiRequest("POST", `/api/users/requests/${requestId}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/requests"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}/requests`] });
       toast({
         title: "Follow request rejected",
       });
@@ -134,8 +126,17 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
           <div className="mt-4 space-y-2">
             <h3 className="font-semibold">Follow Requests</h3>
             {followRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between border-b pb-2">
-                <span className="text-sm">User ID: {request.requesterId}</span>
+              <div key={request.id} className="flex items-center justify-between border-b py-2">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={request.requester?.avatar || undefined} />
+                    <AvatarFallback>{request.requester?.name[0].toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <div className="font-semibold text-sm">{request.requester?.name}</div>
+                    <div className="text-xs text-muted-foreground">@{request.requester?.username}</div>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Button
                     size="sm"

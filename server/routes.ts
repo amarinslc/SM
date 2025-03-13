@@ -99,10 +99,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(following);
   });
 
-  app.get("/api/users/requests", async (req, res) => {
+  app.get("/api/users/:id/requests", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const requests = await storage.getPendingFollowRequests(req.user!.id);
-    res.json(requests);
+    try {
+      const requests = await storage.getPendingFollowRequests(parseInt(req.params.id));
+
+      // Get full user information for each requester
+      const requestsWithUsers = await Promise.all(
+        requests.map(async (request) => {
+          const requester = await storage.getUser(request.requesterId);
+          return {
+            ...request,
+            requester
+          };
+        })
+      );
+
+      res.json(requestsWithUsers);
+    } catch (error) {
+      console.error("Error getting requests:", error);
+      res.status(500).json({ error: "Failed to get requests" });
+    }
   });
 
   app.post("/api/users/requests/:id/accept", async (req, res) => {
