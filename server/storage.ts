@@ -45,7 +45,9 @@ export class MemStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     console.log(`Looking up user by username: ${username}`);
     console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
-    const user = Array.from(this.users.values()).find(
+    const users = Array.from(this.users.values());
+    console.log('All users:', users.map(u => u.username));
+    const user = users.find(
       (user) => user.username === username,
     );
     console.log(`User found:`, user ? 'yes' : 'no');
@@ -164,13 +166,18 @@ export class MemStorage implements IStorage {
     console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
 
     const lowercaseQuery = query.toLowerCase();
-    const results = Array.from(this.users.values()).filter((user) => {
+    const allUsers = Array.from(this.users.values());
+    console.log('All available users:', allUsers.map(u => u.username));
+
+    const results = allUsers.filter((user) => {
       const matchesName = user.name.toLowerCase().includes(lowercaseQuery);
       const matchesUsername = user.username.toLowerCase().includes(lowercaseQuery);
-      return matchesName || matchesUsername;
+      const matches = matchesName || matchesUsername;
+      console.log(`User ${user.username} matches: ${matches}`);
+      return matches;
     });
 
-    console.log(`Found ${results.length} matching users`);
+    console.log(`Found ${results.length} matching users:`, results.map(u => u.username));
     return results;
   }
 }

@@ -16,9 +16,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json([]);
     }
 
-    const users = await storage.searchUsers(query);
-    console.log(`Found ${users.length} users matching query "${query}"`);
-    res.json(users);
+    try {
+      const users = await storage.searchUsers(query);
+      console.log(`Found ${users.length} users matching query "${query}"`);
+      console.log("Search results:", users.map(u => u.username));
+      res.json(users);
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Search failed" });
+    }
   });
 
   app.get("/api/users/:id", async (req, res) => {
