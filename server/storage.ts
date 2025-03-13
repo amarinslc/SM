@@ -70,7 +70,7 @@ export class MemStorage implements IStorage {
 
   async followUser(followerId: number, followingId: number): Promise<void> {
     if (followerId === followingId) throw new Error("Cannot follow yourself");
-    
+
     const follower = await this.getUser(followerId);
     const following = await this.getUser(followingId);
     if (!follower || !following) throw new Error("User not found");
@@ -154,21 +154,34 @@ export class MemStorage implements IStorage {
   }
 
   async getFeed(userId: number): Promise<Post[]> {
+    console.log(`Getting feed for user ${userId}`);
     const following = this.follows.get(userId);
-    if (!following) return [];
-    return Array.from(this.posts.values())
-      .filter((post) => following.has(post.userId) || post.userId === userId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    if (!following) {
+      console.log('No following set found, returning empty feed');
+      return [];
+    }
+
+    console.log(`User follows ${following.size} accounts:`, Array.from(following));
+    const feed = Array.from(this.posts.values())
+      .filter((post) => {
+        const isFollowing = following.has(post.userId);
+        const isOwnPost = post.userId === userId;
+        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}`);
+        return isFollowing || isOwnPost;
+      })
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+
+    console.log(`Returning ${feed.length} posts in feed`);
+    return feed;
   }
 
   async searchUsers(query: string): Promise<User[]> {
     console.log(`Searching users with query: "${query}"`);
-    console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
+    const allUsers = Array.from(this.users.values());
+    console.log(`Current users in storage: ${allUsers.length}`);
+    console.log('All users:', allUsers.map(u => ({ id: u.id, username: u.username })));
 
     const lowercaseQuery = query.toLowerCase();
-    const allUsers = Array.from(this.users.values());
-    console.log('All available users:', allUsers.map(u => ({ username: u.username, id: u.id })));
-
     const results = allUsers.filter((user) => {
       const matchesName = user.name.toLowerCase().includes(lowercaseQuery);
       const matchesUsername = user.username.toLowerCase().includes(lowercaseQuery);
@@ -178,7 +191,7 @@ export class MemStorage implements IStorage {
     });
 
     console.log(`Found ${results.length} matching users:`, results.map(u => u.username));
-    return results.filter(user => user !== undefined);
+    return results;
   }
 }
 
