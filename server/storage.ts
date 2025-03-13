@@ -43,9 +43,13 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
+    console.log(`Looking up user by username: ${username}`);
+    console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
+    const user = Array.from(this.users.values()).find(
       (user) => user.username === username,
     );
+    console.log(`User found:`, user ? 'yes' : 'no');
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -56,6 +60,7 @@ export class MemStorage implements IStorage {
       followerCount: 0,
       followingCount: 0,
     };
+    console.log(`Creating new user with ID ${id}:`, user.username);
     this.users.set(id, user);
     this.follows.set(id, new Set());
     return user;
