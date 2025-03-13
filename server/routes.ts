@@ -140,6 +140,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(posts);
   });
 
+  app.post("/api/posts/:postId/comments", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.postId);
+      const comment = await storage.createComment(
+        postId,
+        req.user!.id,
+        req.body.content
+      );
+      res.status(201).json(comment);
+    } catch (error) {
+      res.status(400).send((error as Error).message);
+    }
+  });
+
+  app.get("/api/posts/:postId/comments", async (req, res) => {
+    try {
+      const postId = parseInt(req.params.postId);
+      const comments = await storage.getComments(postId);
+      res.json(comments);
+    } catch (error) {
+      res.status(400).send((error as Error).message);
+    }
+  });
+
   // Serve uploaded files
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

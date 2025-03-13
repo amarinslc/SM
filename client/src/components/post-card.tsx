@@ -1,19 +1,59 @@
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Post, User } from "@shared/schema";
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Post, User, Comment } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
+import { CommentView } from "./comment";
+import { useState } from "react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 interface PostCardProps {
   post: Post;
 }
 
 export function PostCard({ post }: PostCardProps) {
+  const [newComment, setNewComment] = useState("");
+  const { toast } = useToast();
+
   const { data: author } = useQuery<User>({
     queryKey: [`/api/users/${post.userId}`],
   });
 
+  const { data: comments } = useQuery<Comment[]>({
+    queryKey: [`/api/posts/${post.id}/comments`],
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/posts/${post.id}/comments`, {
+        content: newComment,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      setNewComment("");
+      queryClient.invalidateQueries({ queryKey: [`/api/posts/${post.id}/comments`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to post comment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!author) return null;
+
+  const handleSubmitComment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    createCommentMutation.mutate();
+  };
 
   return (
     <Card className="w-full">
@@ -52,7 +92,38 @@ export function PostCard({ post }: PostCardProps) {
             ))}
           </div>
         )}
+
+        {comments && comments.length > 0 && (
+          <div className="mt-4 space-y-2 border-t pt-4">
+            {comments.map((comment) => (
+              <CommentView key={comment.id} comment={comment} />
+            ))}
+          </div>
+        )}
       </CardContent>
+      <CardFooter>
+        <form onSubmit={handleSubmitComment} className="w-full space-y-2">
+          <Textarea
+            placeholder="Write a comment..."
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            className="resize-none"
+          />
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={createCommentMutation.isPending || !newComment.trim()}
+            >
+              {createCommentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Comment"
+              )}
+            </Button>
+          </div>
+        </form>
+      </CardFooter>
     </Card>
   );
 }

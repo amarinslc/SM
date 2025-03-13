@@ -1,6 +1,6 @@
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import { InsertUser, User, Post } from "@shared/schema";
+import { InsertUser, User, Post, Comment } from "@shared/schema";
 
 const MemoryStore = createMemoryStore(session);
 
@@ -17,22 +17,30 @@ export interface IStorage {
   getFeed(userId: number): Promise<Post[]>;
   sessionStore: session.Store;
   searchUsers(query: string): Promise<User[]>;
+  // Add comment methods
+  createComment(postId: number, userId: number, content: string): Promise<Comment>;
+  getComments(postId: number): Promise<Comment[]>;
+  canComment(userId: number, postId: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private follows: Map<number, Set<number>>;
   private posts: Map<number, Post>;
+  private comments: Map<number, Comment[]>;
   private currentUserId: number;
   private currentPostId: number;
+  private currentCommentId: number;
   sessionStore: session.Store;
 
   constructor() {
     this.users = new Map();
     this.follows = new Map();
     this.posts = new Map();
+    this.comments = new Map();
     this.currentUserId = 1;
     this.currentPostId = 1;
+    this.currentCommentId = 1;
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000,
     });
@@ -192,6 +200,42 @@ export class MemStorage implements IStorage {
 
     console.log(`Found ${results.length} matching users:`, results.map(u => u.username));
     return results;
+  }
+
+  async canComment(userId: number, postId: number): Promise<boolean> {
+    const post = Array.from(this.posts.values()).find(p => p.id === postId);
+    if (!post) return false;
+
+    // Users can always comment on their own posts
+    if (post.userId === userId) return true;
+
+    // Check if the user follows the post creator
+    const following = this.follows.get(userId);
+    return following ? following.has(post.userId) : false;
+  }
+
+  async createComment(postId: number, userId: number, content: string): Promise<Comment> {
+    if (!await this.canComment(userId, postId)) {
+      throw new Error("You can only comment on posts from users you follow");
+    }
+
+    const comment: Comment = {
+      id: this.currentCommentId++,
+      postId,
+      userId,
+      content,
+      createdAt: new Date(),
+    };
+
+    const postComments = this.comments.get(postId) || [];
+    postComments.push(comment);
+    this.comments.set(postId, postComments);
+
+    return comment;
+  }
+
+  async getComments(postId: number): Promise<Comment[]> {
+    return this.comments.get(postId) || [];
   }
 }
 
