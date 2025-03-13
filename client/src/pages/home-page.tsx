@@ -23,7 +23,15 @@ export default function HomePage() {
   });
 
   const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
-    queryKey: ["/api/users/search", { q: searchQuery }],
+    queryKey: ["/api/users/search"],
+    queryFn: async () => {
+      if (!searchQuery) return [];
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
     enabled: searchQuery.length > 0,
   });
 
