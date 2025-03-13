@@ -242,9 +242,9 @@ export class MemStorage implements IStorage {
       .filter((post) => {
         const isFollowing = following.has(post.userId);
         const isOwnPost = post.userId === userId;
-        const user = this.users.get(post.userId);
-        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}, isPrivate=${user?.isPrivate}`);
-        return isFollowing || isOwnPost || !user?.isPrivate; //Added this line to include public posts
+        console.log(`Post ${post.id} by user ${post.userId}: following=${isFollowing}, own=${isOwnPost}`);
+        // Only show posts from followed users or own posts
+        return isFollowing || isOwnPost;
       })
       .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 

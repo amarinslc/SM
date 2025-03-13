@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import {useEffect} from 'react';
 
 interface UserCardProps {
   user: User;
@@ -21,6 +22,10 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     queryKey: ["/api/users/requests"],
     enabled: currentUser?.id === user.id,
   });
+
+  useEffect(() => {
+    console.log('Follow requests:', followRequests);
+  }, [followRequests]);
 
   const hasPendingRequest = followRequests?.some(
     (req) => req.targetId === user.id && req.requesterId === currentUser?.id
@@ -129,8 +134,8 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
           <div className="mt-4 space-y-2">
             <h3 className="font-semibold">Follow Requests</h3>
             {followRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between">
-                <span className="text-sm">@{request.requesterId}</span>
+              <div key={request.id} className="flex items-center justify-between border-b pb-2">
+                <span className="text-sm">User ID: {request.requesterId}</span>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
