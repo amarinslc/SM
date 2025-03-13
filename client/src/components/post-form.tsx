@@ -3,34 +3,42 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ImagePlus, Loader2, Video } from "lucide-react";
-import { useState } from "react";
+import { ImagePlus, Loader2, Video, X } from "lucide-react";
+import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { insertPostSchema } from "@shared/schema";
 
 interface MediaItem {
   type: "image" | "video";
-  url: string;
+  file: File;
+  previewUrl: string;
 }
 
 export function PostForm() {
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const createPostMutation = useMutation({
     mutationFn: async () => {
-      const result = insertPostSchema.safeParse({
-        content,
-        media,
+      const formData = new FormData();
+      formData.append("content", content);
+      media.forEach((item, index) => {
+        formData.append(`media_${index}`, item.file);
       });
 
-      if (!result.success) {
-        throw new Error("Invalid post data");
+      const res = await fetch("/api/posts", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create post");
       }
 
-      const res = await apiRequest("POST", "/api/posts", result.data);
-      return await res.json();
+      return res.json();
     },
     onSuccess: () => {
       setContent("");
@@ -50,9 +58,56 @@ export function PostForm() {
     },
   });
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+
+    const newMedia: MediaItem[] = [];
+    for (const file of Array.from(files)) {
+      // Check file type
+      if (!file.type.startsWith("image/")) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload only image files",
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      // Check file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Image size should be less than 5MB",
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      newMedia.push({
+        type: "image",
+        file,
+        previewUrl,
+      });
+    }
+
+    setMedia([...media, ...newMedia]);
+    e.target.value = ""; // Reset input
+  };
+
+  const removeMedia = (index: number) => {
+    setMedia((prev) => {
+      const newMedia = [...prev];
+      URL.revokeObjectURL(newMedia[index].previewUrl);
+      newMedia.splice(index, 1);
+      return newMedia;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() && !media.length) return;
     createPostMutation.mutate();
   };
 
@@ -66,18 +121,44 @@ export function PostForm() {
             onChange={(e) => setContent(e.target.value)}
             className="min-h-[100px]"
           />
+          {media.length > 0 && (
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {media.map((item, index) => (
+                <div key={index} className="relative">
+                  <img
+                    src={item.previewUrl}
+                    alt=""
+                    className="w-full aspect-square object-cover rounded-md"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-6 w-6"
+                    onClick={() => removeMedia(index)}
+                    type="button"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
         <CardFooter className="justify-between">
           <div className="flex gap-2">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleImageSelect}
+            />
             <Button
               type="button"
               variant="outline"
               size="icon"
-              onClick={() => {
-                toast({
-                  description: "Image upload not implemented in this demo",
-                });
-              }}
+              onClick={() => fileInputRef.current?.click()}
             >
               <ImagePlus className="h-4 w-4" />
             </Button>
@@ -87,7 +168,7 @@ export function PostForm() {
               size="icon"
               onClick={() => {
                 toast({
-                  description: "Video upload not implemented in this demo",
+                  description: "Video upload will be implemented soon",
                 });
               }}
             >
@@ -96,7 +177,7 @@ export function PostForm() {
           </div>
           <Button
             type="submit"
-            disabled={createPostMutation.isPending || !content.trim()}
+            disabled={createPostMutation.isPending || (!content.trim() && !media.length)}
           >
             {createPostMutation.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />

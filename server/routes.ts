@@ -3,14 +3,40 @@ import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { insertPostSchema } from "@shared/schema";
+import multer from "multer";
+import path from "path";
+import fs from "fs/promises";
+import express from 'express';
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(null, false);
+    }
+  }
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Ensure uploads directory exists
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  try {
+    await fs.access(uploadsDir);
+  } catch {
+    await fs.mkdir(uploadsDir, { recursive: true });
+  }
+
   // Search endpoint should be before dynamic routes to avoid conflicts
   app.get("/api/users/search", async (req, res) => {
     const query = req.query.q?.toString() || "";
-    console.log(`Search query received: "${query}"`); // Add logging
+    console.log(`Search query received: "${query}"`);
     if (!query) {
       console.log("Empty query, returning empty results");
       return res.json([]);
@@ -63,18 +89,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(following);
   });
 
-  app.post("/api/posts", async (req, res) => {
+  app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const result = insertPostSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json(result.error);
+
+    try {
+      const files = req.files as Express.Multer.File[] | undefined;
+      const media = [];
+
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
+          const filePath = path.join('uploads', filename);
+
+          await fs.writeFile(filePath, file.buffer);
+          media.push({
+            type: 'image',
+            url: `/uploads/${filename}`
+          });
+        }
+      }
+
+      const post = await storage.createPost(
+        req.user!.id,
+        req.body.content,
+        media
+      );
+
+      res.status(201).json(post);
+    } catch (error) {
+      console.error('Error creating post:', error);
+      res.status(400).json({ error: (error as Error).message });
     }
-    const post = await storage.createPost(
-      req.user!.id,
-      result.data.content,
-      result.data.media,
-    );
-    res.status(201).json(post);
   });
 
   app.get("/api/posts/:userId", async (req, res) => {
@@ -87,6 +132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const posts = await storage.getFeed(req.user!.id);
     res.json(posts);
   });
+
+  // Serve uploaded files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   const httpServer = createServer(app);
   return httpServer;
