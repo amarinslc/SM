@@ -6,18 +6,30 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ImagePlus, Loader2, Video } from "lucide-react";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { insertPostSchema } from "@shared/schema";
+
+interface MediaItem {
+  type: "image" | "video";
+  url: string;
+}
 
 export function PostForm() {
   const [content, setContent] = useState("");
-  const [media, setMedia] = useState<any[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>([]);
   const { toast } = useToast();
 
   const createPostMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/posts", {
+      const result = insertPostSchema.safeParse({
         content,
         media,
       });
+
+      if (!result.success) {
+        throw new Error("Invalid post data");
+      }
+
+      const res = await apiRequest("POST", "/api/posts", result.data);
       return await res.json();
     },
     onSuccess: () => {
@@ -62,7 +74,6 @@ export function PostForm() {
               variant="outline"
               size="icon"
               onClick={() => {
-                // Handle image upload
                 toast({
                   description: "Image upload not implemented in this demo",
                 });
@@ -75,7 +86,6 @@ export function PostForm() {
               variant="outline"
               size="icon"
               onClick={() => {
-                // Handle video upload
                 toast({
                   description: "Video upload not implemented in this demo",
                 });
