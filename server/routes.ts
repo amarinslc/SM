@@ -68,6 +68,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(posts);
   });
 
+  app.get("/api/users/search", async (req, res) => {
+    const query = req.query.q?.toString().toLowerCase() || "";
+    if (!query) return res.json([]);
+
+    const users = await storage.searchUsers(query);
+    res.json(users);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

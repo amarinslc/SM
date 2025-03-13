@@ -16,6 +16,7 @@ export interface IStorage {
   getPosts(userId: number): Promise<Post[]>;
   getFeed(userId: number): Promise<Post[]>;
   sessionStore: session.Store;
+  searchUsers(query: string): Promise<User[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -151,6 +152,15 @@ export class MemStorage implements IStorage {
     return Array.from(this.posts.values())
       .filter((post) => following.has(post.userId) || post.userId === userId)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    const lowercaseQuery = query.toLowerCase();
+    return Array.from(this.users.values()).filter(
+      (user) =>
+        user.name.toLowerCase().includes(lowercaseQuery) ||
+        user.username.toLowerCase().includes(lowercaseQuery)
+    );
   }
 }
 
