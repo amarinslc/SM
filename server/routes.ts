@@ -115,6 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
 
+      console.log("Sending follow requests:", requests);
       res.json(requestsWithUsers);
     } catch (error) {
       console.error("Error getting requests:", error);

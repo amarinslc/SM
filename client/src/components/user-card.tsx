@@ -22,9 +22,11 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     enabled: currentUser?.id === user.id,
   });
 
-  const hasPendingRequest = followRequests?.some(
-    (req) => req.targetId === user.id && req.requesterId === currentUser?.id
-  );
+  const { data: following } = useQuery<User[]>({
+    queryKey: [`/api/users/${currentUser?.id}/following`],
+  });
+
+  const hasPendingRequest = following?.some((u) => u.id === user.id) ?? false;
 
   const followMutation = useMutation({
     mutationFn: async () => {

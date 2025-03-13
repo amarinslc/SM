@@ -122,9 +122,12 @@ export class MemStorage implements IStorage {
   }
 
   async getPendingFollowRequests(userId: number): Promise<FollowRequest[]> {
-    return Array.from(this.followRequests.values()).filter(
+    console.log(`Getting pending follow requests for user ${userId}`);
+    const requests = Array.from(this.followRequests.values()).filter(
       (req) => req.targetId === userId
     );
+    console.log(`Found ${requests.length} pending requests:`, requests);
+    return requests;
   }
 
   async acceptFollowRequest(requestId: number): Promise<void> {
