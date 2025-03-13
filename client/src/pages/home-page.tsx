@@ -29,6 +29,11 @@ export default function HomePage() {
 
   if (!user) return null;
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -41,7 +46,7 @@ export default function HomePage() {
                 placeholder="Search users..."
                 className="w-64"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearch}
               />
               <Search className="absolute right-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
             </div>

@@ -155,12 +155,18 @@ export class MemStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
+    console.log(`Searching users with query: "${query}"`);
+    console.log(`Current users in storage: ${Array.from(this.users.values()).length}`);
+
     const lowercaseQuery = query.toLowerCase();
-    return Array.from(this.users.values()).filter(
-      (user) =>
-        user.name.toLowerCase().includes(lowercaseQuery) ||
-        user.username.toLowerCase().includes(lowercaseQuery)
-    );
+    const results = Array.from(this.users.values()).filter((user) => {
+      const matchesName = user.name.toLowerCase().includes(lowercaseQuery);
+      const matchesUsername = user.username.toLowerCase().includes(lowercaseQuery);
+      return matchesName || matchesUsername;
+    });
+
+    console.log(`Found ${results.length} matching users`);
+    return results;
   }
 }
 

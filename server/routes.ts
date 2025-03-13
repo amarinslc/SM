@@ -9,10 +9,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Search endpoint should be before dynamic routes to avoid conflicts
   app.get("/api/users/search", async (req, res) => {
-    const query = req.query.q?.toString().toLowerCase() || "";
-    if (!query) return res.json([]);
+    const query = req.query.q?.toString() || "";
+    console.log(`Search query received: "${query}"`); // Add logging
+    if (!query) {
+      console.log("Empty query, returning empty results");
+      return res.json([]);
+    }
 
     const users = await storage.searchUsers(query);
+    console.log(`Found ${users.length} users matching query "${query}"`);
     res.json(users);
   });
 
