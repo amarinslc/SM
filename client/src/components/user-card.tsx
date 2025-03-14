@@ -30,7 +30,8 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
 
   const followMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/users/${user.id}/follow`);
+      const endpoint = isFollowing ? "unfollow" : "follow";
+      await apiRequest("POST", `/api/users/${user.id}/${endpoint}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
