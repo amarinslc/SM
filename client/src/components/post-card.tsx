@@ -10,6 +10,7 @@ import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Link } from "wouter";
 
 interface PostCardProps {
   post: Post;
@@ -58,12 +59,18 @@ export function PostCard({ post }: PostCardProps) {
   return (
     <Card className="w-full">
       <CardHeader className="flex-row space-x-4 items-center">
-        <Avatar>
-          <AvatarImage src={author.avatar || undefined} />
-          <AvatarFallback>{author.name[0]}</AvatarFallback>
-        </Avatar>
+        <Link href={`/profile/${author.id}`}>
+          <a>
+            <Avatar>
+              <AvatarImage src={author.avatar || undefined} />
+              <AvatarFallback>{author.name[0]}</AvatarFallback>
+            </Avatar>
+          </a>
+        </Link>
         <div className="flex flex-col">
-          <span className="font-semibold">{author.name}</span>
+          <Link href={`/profile/${author.id}`}>
+            <a className="font-semibold hover:underline">{author.name}</a>
+          </Link>
           <span className="text-sm text-muted-foreground">
             {formatDistanceToNow(post.createdAt || new Date(), { addSuffix: true })}
           </span>
