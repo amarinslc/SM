@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { User } from "@shared/schema";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -19,7 +20,7 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-export function ProfileEditor({ user, onSuccess }: { user: any; onSuccess?: () => void }) {
+export function ProfileEditor({ user }: { user: User }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -38,18 +39,19 @@ export function ProfileEditor({ user, onSuccess }: { user: any; onSuccess?: () =
     try {
       await apiRequest("/api/user/profile", {
         method: "PATCH",
-        body: JSON.stringify(data),
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
       });
 
       // Invalidate user queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      
+
       toast({
         title: "Success",
         description: "Your profile has been updated.",
       });
-      
-      onSuccess?.();
     } catch (error) {
       toast({
         title: "Error",
@@ -78,7 +80,7 @@ export function ProfileEditor({ user, onSuccess }: { user: any; onSuccess?: () =
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="email"
@@ -92,7 +94,7 @@ export function ProfileEditor({ user, onSuccess }: { user: any; onSuccess?: () =
               </FormItem>
             )}
           />
-          
+
           <FormField
             control={form.control}
             name="bio"
@@ -100,7 +102,7 @@ export function ProfileEditor({ user, onSuccess }: { user: any; onSuccess?: () =
               <FormItem>
                 <FormLabel>Bio</FormLabel>
                 <FormControl>
-                  <Textarea {...field} />
+                  <Textarea {...field} value={field.value || ""} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
