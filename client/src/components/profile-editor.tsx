@@ -20,7 +20,7 @@ const profileSchema = z.object({
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
-export function ProfileEditor({ user }: { user: User }) {
+export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -37,25 +37,32 @@ export function ProfileEditor({ user }: { user: User }) {
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
-      await apiRequest("/api/user/profile", {
-        method: "PATCH",
+      const response = await apiRequest("PATCH", "/api/user/profile", {
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify(data)
       });
 
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to update profile');
+      }
+
       // Invalidate user queries to refresh the data
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
 
       toast({
         title: "Success",
         description: "Your profile has been updated.",
       });
+
+      onSuccess?.();
     } catch (error) {
+      console.error('Profile update error:', error);
       toast({
         title: "Error",
-        description: "Failed to update profile. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     } finally {
