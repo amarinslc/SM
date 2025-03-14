@@ -64,14 +64,22 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot follow yourself");
     }
 
+    // Ensure both IDs are valid integers
+    const followerIdInt = typeof followerId === 'number' ? followerId : parseInt(followerId as any);
+    const followingIdInt = typeof followingId === 'number' ? followingId : parseInt(followingId as any);
+
+    if (isNaN(followerIdInt) || isNaN(followingIdInt)) {
+      throw new Error("Invalid user IDs");
+    }
+
     // Check if already following
     const [existing] = await db
       .select()
       .from(follows)
       .where(
         and(
-          eq(follows.followerId, followerId),
-          eq(follows.followingId, followingId)
+          eq(follows.followerId, followerIdInt),
+          eq(follows.followingId, followingIdInt)
         )
       );
 
@@ -83,21 +91,21 @@ export class DatabaseStorage implements IStorage {
     await db.transaction(async (tx) => {
       // Create follow relationship
       await tx.insert(follows).values({
-        followerId,
-        followingId,
+        followerId: followerIdInt,
+        followingId: followingIdInt,
       });
 
       // Update follower count
       await tx
         .update(users)
-        .set({ followingCount: users.followingCount + 1 })
-        .where(eq(users.id, followerId));
+        .set({ followingCount: sql`${users.followingCount} + 1` })
+        .where(eq(users.id, followerIdInt));
 
       // Update following count
       await tx
         .update(users)
-        .set({ followerCount: users.followerCount + 1 })
-        .where(eq(users.id, followingId));
+        .set({ followerCount: sql`${users.followerCount} + 1` })
+        .where(eq(users.id, followingIdInt));
     });
   }
 

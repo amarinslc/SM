@@ -62,14 +62,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/:id/follow", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      const targetUser = await storage.getUser(parseInt(req.params.id));
+      const targetId = parseInt(req.params.id);
+      if (isNaN(targetId)) {
+        return res.status(400).send("Invalid user ID");
+      }
+
+      const targetUser = await storage.getUser(targetId);
       if (!targetUser) {
         return res.status(404).send("User not found");
       }
 
-      await storage.followUser(req.user!.id, parseInt(req.params.id));
+      await storage.followUser(req.user!.id, targetId);
       res.sendStatus(200);
     } catch (error) {
+      console.error("Follow error:", error);
       res.status(400).send((error as Error).message);
     }
   });
