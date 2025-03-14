@@ -30,7 +30,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
 
   const followMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", `/api/users/${user.id}/${isFollowing ? "unfollow" : "follow"}`);
+      await apiRequest("POST", `/api/users/${user.id}/follow`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
@@ -39,11 +39,9 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       toast({
-        title: isFollowing ? "Unfollowed" : user.isPrivate ? "Request sent" : "Following",
+        title: isFollowing ? "Unfollowed" : "Following",
         description: isFollowing
           ? `You unfollowed ${user.name}`
-          : user.isPrivate
-          ? `Follow request sent to ${user.name}`
           : `You are now following ${user.name}`,
       });
     },

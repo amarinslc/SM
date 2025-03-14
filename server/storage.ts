@@ -176,17 +176,20 @@ export class DatabaseStorage implements IStorage {
     const following = await this.getFollowing(userId);
     const followingIds = following.map((u) => u.id);
 
-    // Get posts from followed users and own posts
-    return db
+    // Only get posts from followed users and own posts
+    const feed = await db
       .select()
       .from(posts)
       .where(
         or(
           eq(posts.userId, userId),
-          inArray(posts.userId, followingIds)
+          // Only include posts from users we follow if we have any
+          followingIds.length > 0 ? inArray(posts.userId, followingIds) : sql`false`
         )
       )
-      .orderBy(posts.createdAt);
+      .orderBy(sql`${posts.createdAt} DESC`);
+
+    return feed;
   }
 
   async createComment(postId: number, userId: number, content: string): Promise<Comment> {
