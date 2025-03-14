@@ -59,7 +59,7 @@ export default function HomePage() {
               />
               <Search className="absolute right-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
             </div>
-            <Link href={`/profile/${user.id}`}>
+            <Link href="/profile">
               <Button variant="ghost" size="icon">
                 <UserIcon className="h-5 w-5" />
               </Button>
