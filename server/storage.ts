@@ -11,6 +11,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User>;
   followUser(followerId: number, followingId: number): Promise<void>;
   unfollowUser(followerId: number, followingId: number): Promise<void>;
   getFollowers(userId: number): Promise<User[]>;
@@ -240,6 +241,20 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return !!follow;
+  }
+
+  async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set(data)
+      .where(eq(users.id, id))
+      .returning();
+
+    if (!updatedUser) {
+      throw new Error('User not found');
+    }
+
+    return updatedUser;
   }
 }
 

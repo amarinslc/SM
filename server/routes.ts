@@ -33,6 +33,29 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Add new profile update endpoint
+  app.patch("/api/user/profile", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      console.log('Profile update request:', req.body);
+
+      // Only allow updating specific fields
+      const allowedFields = ['email', 'name', 'bio', 'avatar'];
+      const updateData = Object.fromEntries(
+        Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
+      );
+
+      const updatedUser = await storage.updateUser(req.user!.id, updateData);
+      console.log('Profile updated successfully:', updatedUser);
+
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(400).send((error as Error).message);
+    }
+  });
+
   // Search endpoint should be before dynamic routes to avoid conflicts
   app.get("/api/users/search", async (req, res) => {
     const query = req.query.q?.toString() || "";
