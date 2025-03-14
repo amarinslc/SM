@@ -67,13 +67,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).send("User not found");
       }
 
-      if (targetUser.isPrivate) {
-        const request = await storage.requestFollow(req.user!.id, parseInt(req.params.id));
-        res.status(201).json(request);
-      } else {
-        await storage.followUser(req.user!.id, parseInt(req.params.id));
-        res.sendStatus(200);
-      }
+      await storage.followUser(req.user!.id, parseInt(req.params.id));
+      res.sendStatus(200);
     } catch (error) {
       res.status(400).send((error as Error).message);
     }
