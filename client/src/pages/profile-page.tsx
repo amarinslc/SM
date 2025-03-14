@@ -4,12 +4,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 
 export default function ProfilePage() {
   const { id } = useParams();
   const { user: currentUser } = useAuth();
-  const userId = parseInt(id);
+  const userId = id ? parseInt(id) : currentUser?.id;
+
+  if (!userId) {
+    return <div>No user ID provided</div>;
+  }
 
   const { data: user, isLoading: isUserLoading } = useQuery<User>({
     queryKey: [`/api/users/${userId}`],
@@ -37,21 +41,35 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-background">
       <main className="container py-6">
         <div className="grid md:grid-cols-[300px_1fr] gap-6">
-          <div>
+          <div className="space-y-4">
             <UserCard user={user} isFollowing={isFollowing} />
           </div>
 
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold">Posts</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">Posts</h2>
+              {currentUser?.id === user.id && (
+                <Link href="/">
+                  <a className="text-sm text-muted-foreground hover:text-foreground">
+                    Back to Feed
+                  </a>
+                </Link>
+              )}
+            </div>
+
             {isPostsLoading ? (
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : (
+            ) : posts && posts.length > 0 ? (
               <div className="space-y-4">
-                {posts?.map((post) => (
+                {posts.map((post) => (
                   <PostCard key={post.id} post={post} />
                 ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No posts yet
               </div>
             )}
           </div>

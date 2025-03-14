@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, LogOut, Search } from "lucide-react";
+import { Loader2, LogOut, Search, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { Link } from "wouter";
 
@@ -59,6 +59,11 @@ export default function HomePage() {
               />
               <Search className="absolute right-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
             </div>
+            <Link href={`/profile/${user.id}`}>
+              <Button variant="ghost" size="icon">
+                <UserIcon className="h-5 w-5" />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -101,12 +106,14 @@ export default function HomePage() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
-            ) : (
+            ) : feed?.length ? (
               <div className="space-y-4">
-                {feed?.map((post) => (
+                {feed.map((post) => (
                   <PostCard key={post.id} post={post} />
                 ))}
               </div>
+            ) : (
+              <p className="text-center text-muted-foreground">No posts in your feed</p>
             )}
           </div>
 
@@ -126,14 +133,16 @@ export default function HomePage() {
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
-              ) : (
-                following?.map((followedUser) => (
+              ) : following?.length ? (
+                following.map((followedUser) => (
                   <UserCard
                     key={followedUser.id}
                     user={followedUser}
                     isFollowing={true}
                   />
                 ))
+              ) : (
+                <p className="text-muted-foreground">You're not following anyone yet</p>
               )}
             </div>
           </div>
