@@ -40,10 +40,14 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
     try {
       console.log('Profile update request:', data);
 
-      // Only include fields that have changed
+      // Filter out unchanged values and properly handle empty strings
       const changedFields = Object.entries(data).reduce((acc, [key, value]) => {
-        if (value !== user[key as keyof ProfileFormData]) {
-          acc[key] = value.trim();
+        const trimmedValue = typeof value === 'string' ? value.trim() : value;
+        const currentValue = user[key as keyof User];
+
+        // Include the field if it's different from current value
+        if (trimmedValue !== currentValue) {
+          acc[key] = trimmedValue;
         }
         return acc;
       }, {} as Record<string, string>);
