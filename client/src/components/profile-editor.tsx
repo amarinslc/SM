@@ -38,11 +38,20 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
+      // Filter out empty values
+      const updateData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
+      );
+
+      if (Object.keys(updateData).length === 0) {
+        throw new Error('Please provide at least one field to update');
+      }
+
       const response = await apiRequest("PATCH", "/api/user/profile", {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(updateData)
       });
 
       if (!response.ok) {
