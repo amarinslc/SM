@@ -40,28 +40,11 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
     try {
       console.log('Profile update request:', data);
 
-      // Compare with current values and only send changed fields
-      const currentValues = {
-        name: user.name?.trim() || '',
-        email: user.email?.trim() || '',
-        bio: user.bio?.trim() || ''
+      const updateData = {
+        name: data.name,
+        email: data.email,
+        bio: data.bio
       };
-
-      const updateData = Object.entries(data).reduce((acc, [key, value]) => {
-        const trimmedValue = (value || '').trim();
-        const currentValue = currentValues[key as keyof typeof currentValues];
-
-        if (trimmedValue !== currentValue) {
-          acc[key] = trimmedValue;
-        }
-        return acc;
-      }, {} as Record<string, string>);
-
-      console.log('Update data:', updateData);
-
-      if (Object.keys(updateData).length === 0) {
-        throw new Error('No changes detected');
-      }
 
       const response = await apiRequest("PATCH", "/api/user/profile", {
         headers: {
