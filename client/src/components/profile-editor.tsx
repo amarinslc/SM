@@ -40,21 +40,26 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
     try {
       console.log('Profile update request:', data);
 
-      // Filter out unchanged values and properly handle empty strings
-      const changedFields = Object.entries(data).reduce((acc, [key, value]) => {
-        const trimmedValue = typeof value === 'string' ? value.trim() : value;
-        const currentValue = user[key as keyof User];
+      // Compare with current values and only send changed fields
+      const currentValues = {
+        name: user.name?.trim() || '',
+        email: user.email?.trim() || '',
+        bio: user.bio?.trim() || ''
+      };
 
-        // Include the field if it's different from current value
+      const updateData = Object.entries(data).reduce((acc, [key, value]) => {
+        const trimmedValue = (value || '').trim();
+        const currentValue = currentValues[key as keyof typeof currentValues];
+
         if (trimmedValue !== currentValue) {
           acc[key] = trimmedValue;
         }
         return acc;
       }, {} as Record<string, string>);
 
-      console.log('Changed fields:', changedFields);
+      console.log('Update data:', updateData);
 
-      if (Object.keys(changedFields).length === 0) {
+      if (Object.keys(updateData).length === 0) {
         throw new Error('No changes detected');
       }
 
@@ -62,7 +67,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(changedFields)
+        body: JSON.stringify(updateData)
       });
 
       if (!response.ok) {
