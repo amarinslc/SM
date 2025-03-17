@@ -5,8 +5,10 @@ import { ProfileEditor } from "@/components/profile-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Pencil, Loader2 } from "lucide-react";
+import { useParams } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
 
-function ProfileView({ user, onEdit }: { user: User; onEdit: () => void }) {
+function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () => void; isOwnProfile: boolean }) {
   return (
     <Card>
       <CardContent className="pt-6 space-y-4">
@@ -15,10 +17,12 @@ function ProfileView({ user, onEdit }: { user: User; onEdit: () => void }) {
             <h2 className="text-2xl font-bold">{user.name}</h2>
             <p className="text-muted-foreground">@{user.username}</p>
           </div>
-          <Button onClick={onEdit} variant="outline" size="sm">
-            <Pencil className="h-4 w-4 mr-2" />
-            Edit Profile
-          </Button>
+          {isOwnProfile && onEdit && (
+            <Button onClick={onEdit} variant="outline" size="sm">
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit Profile
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -46,8 +50,11 @@ function ProfileView({ user, onEdit }: { user: User; onEdit: () => void }) {
 
 export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
+  const { id } = useParams<{ id: string }>();
+  const { user: currentUser } = useAuth();
+
   const { data: user, isLoading } = useQuery<User>({
-    queryKey: ["/api/user"],
+    queryKey: id ? [`/api/users/${id}`] : ["/api/user"],
   });
 
   if (isLoading) {
@@ -59,15 +66,17 @@ export function ProfilePage() {
   }
 
   if (!user) {
-    return <div>Please log in to view your profile.</div>;
+    return <div>User not found</div>;
   }
+
+  const isOwnProfile = !id || (currentUser && currentUser.id === parseInt(id));
 
   return (
     <div className="container mx-auto py-6 px-4">
       <h1 className="text-2xl font-bold mb-6">Profile</h1>
 
       <div className="max-w-2xl">
-        {isEditing ? (
+        {isEditing && isOwnProfile ? (
           <>
             <ProfileEditor user={user} onSuccess={() => setIsEditing(false)} />
             <Button 
@@ -79,7 +88,11 @@ export function ProfilePage() {
             </Button>
           </>
         ) : (
-          <ProfileView user={user} onEdit={() => setIsEditing(true)} />
+          <ProfileView 
+            user={user} 
+            onEdit={isOwnProfile ? () => setIsEditing(true) : undefined}
+            isOwnProfile={isOwnProfile}
+          />
         )}
       </div>
     </div>

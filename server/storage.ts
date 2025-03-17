@@ -244,23 +244,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
-    // Filter out undefined and empty values, but keep falsy values that might be intentional
+    // Filter out undefined values but allow empty strings and other falsy values
     const cleanData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
+      Object.entries(data).filter(([_, value]) => value !== undefined)
     );
 
     if (Object.keys(cleanData).length === 0) {
       throw new Error('No valid data provided for update');
     }
 
+    // Update user data
     const [updatedUser] = await db
       .update(users)
-      .set({
-        ...cleanData,
-        // Ensure we're using SQL for arithmetic operations
-        followingCount: sql`${users.followingCount}`,
-        followerCount: sql`${users.followerCount}`
-      })
+      .set(cleanData)
       .where(eq(users.id, id))
       .returning();
 
