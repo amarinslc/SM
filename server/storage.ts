@@ -244,7 +244,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
-    // Filter out undefined and empty string values
+    // Filter out undefined and empty values, but keep falsy values that might be intentional
     const cleanData = Object.fromEntries(
       Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
     );
@@ -255,7 +255,12 @@ export class DatabaseStorage implements IStorage {
 
     const [updatedUser] = await db
       .update(users)
-      .set(cleanData)
+      .set({
+        ...cleanData,
+        // Ensure we're using SQL for arithmetic operations
+        followingCount: sql`${users.followingCount}`,
+        followerCount: sql`${users.followerCount}`
+      })
       .where(eq(users.id, id))
       .returning();
 
