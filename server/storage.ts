@@ -249,6 +249,8 @@ export class DatabaseStorage implements IStorage {
       Object.entries(data).filter(([_, value]) => value !== undefined)
     );
 
+    console.log('Clean data for update:', cleanData);
+
     if (Object.keys(cleanData).length === 0) {
       throw new Error('No valid data provided for update');
     }

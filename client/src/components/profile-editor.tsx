@@ -40,15 +40,25 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
     try {
       console.log('Profile update request:', data);
 
+      // Only include fields that have changed
+      const changedFields = Object.entries(data).reduce((acc, [key, value]) => {
+        if (value !== user[key as keyof ProfileFormData]) {
+          acc[key] = value.trim();
+        }
+        return acc;
+      }, {} as Record<string, string>);
+
+      console.log('Changed fields:', changedFields);
+
+      if (Object.keys(changedFields).length === 0) {
+        throw new Error('No changes detected');
+      }
+
       const response = await apiRequest("PATCH", "/api/user/profile", {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          name: data.name.trim(),
-          email: data.email.trim(),
-          bio: data.bio?.trim()
-        })
+        body: JSON.stringify(changedFields)
       });
 
       if (!response.ok) {
