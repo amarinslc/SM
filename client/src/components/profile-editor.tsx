@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { User } from "@shared/schema";
+import { Loader2 } from "lucide-react";
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -117,7 +118,14 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
           />
 
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </form>
       </Form>

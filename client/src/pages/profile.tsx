@@ -4,7 +4,7 @@ import { User } from "@shared/schema";
 import { ProfileEditor } from "@/components/profile-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil } from "lucide-react";
+import { Pencil, Loader2 } from "lucide-react";
 
 function ProfileView({ user, onEdit }: { user: User; onEdit: () => void }) {
   return (
@@ -51,7 +51,11 @@ export function ProfilePage() {
   });
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   if (!user) {
