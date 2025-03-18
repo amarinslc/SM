@@ -54,17 +54,16 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#FFF1E0] flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden">
-        <div className="p-6 bg-primary text-primary-foreground flex flex-col justify-center">
-          <h1 className="text-3xl font-bold mb-4">Welcome to Dunbar</h1>
+        <div className="p-6 bg-[#87BA8E] text-white flex flex-col justify-center">
+          <h1 className="text-3xl font-bold mb-2">Because real relationships matter.</h1>
           <p className="text-lg opacity-90 mb-6">
-            A social network that values real relationships. Connect meaningfully
-            with up to 200 people who matter most.
+            Connect to no more than 150 people. No AI. No Ads. No influencers.
           </p>
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="bg-white/10 p-4 rounded-lg text-center">
-              <div className="font-bold text-2xl">200</div>
+              <div className="font-bold text-2xl">150</div>
               <div>Connection Limit</div>
             </div>
             <div className="bg-white/10 p-4 rounded-lg text-center">
@@ -72,8 +71,8 @@ export default function AuthPage() {
               <div>Real People</div>
             </div>
             <div className="bg-white/10 p-4 rounded-lg text-center">
-              <div className="font-bold text-2xl">∞</div>
-              <div>Meaningful Bonds</div>
+              <div className="font-bold text-2xl">0</div>
+              <div>Bots & Ads</div>
             </div>
           </div>
         </div>
@@ -127,7 +126,7 @@ export default function AuthPage() {
                     />
                     <Button
                       type="submit"
-                      className="w-full"
+                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? (
@@ -235,7 +234,7 @@ export default function AuthPage() {
                     />
                     <Button
                       type="submit"
-                      className="w-full"
+                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? (
