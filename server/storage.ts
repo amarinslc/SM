@@ -113,25 +113,34 @@ export class DatabaseStorage implements IStorage {
   async unfollowUser(followerId: number, followingId: number): Promise<void> {
     await db.transaction(async (tx) => {
       // Remove follow relationship
-      await tx
+      const [deletedFollow] = await tx
         .delete(follows)
         .where(
           and(
             eq(follows.followerId, followerId),
             eq(follows.followingId, followingId)
           )
-        );
+        )
+        .returning();
 
-      // Update follower count
+      if (!deletedFollow) {
+        throw new Error("Not following this user");
+      }
+
+      // Update follower count using SQL expression
       await tx
         .update(users)
-        .set({ followingCount: users.followingCount - 1 })
+        .set({ 
+          followingCount: sql`GREATEST(${users.followingCount} - 1, 0)` 
+        })
         .where(eq(users.id, followerId));
 
       // Update following count
       await tx
         .update(users)
-        .set({ followerCount: users.followerCount - 1 })
+        .set({ 
+          followerCount: sql`GREATEST(${users.followerCount} - 1, 0)` 
+        })
         .where(eq(users.id, followingId));
     });
   }
