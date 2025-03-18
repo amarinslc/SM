@@ -8,44 +8,80 @@ import { Pencil, Loader2 } from "lucide-react";
 import { useParams } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { PostCard } from "@/components/post-card";
+import { UserListDrawer } from "@/components/user-list-drawer";
+
+type ListType = "followers" | "following" | null;
 
 function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () => void; isOwnProfile: boolean }) {
+  const [listType, setListType] = useState<ListType>(null);
+
+  // Fetch followers and following lists when needed
+  const { data: followers, isLoading: isFollowersLoading } = useQuery<User[]>({
+    queryKey: [`/api/users/${user.id}/followers`],
+    enabled: listType === "followers",
+  });
+
+  const { data: following, isLoading: isFollowingLoading } = useQuery<User[]>({
+    queryKey: [`/api/users/${user.id}/following`],
+    enabled: listType === "following",
+  });
+
   return (
-    <Card>
-      <CardContent className="pt-6 space-y-4">
-        <div className="flex justify-between items-start">
-          <div>
-            <h2 className="text-2xl font-bold">{user.name}</h2>
-            <p className="text-muted-foreground">@{user.username}</p>
-          </div>
-          {isOwnProfile && onEdit && (
-            <Button onClick={onEdit} variant="outline" size="sm">
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit Profile
-            </Button>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <div>
-            <label className="font-medium">Email</label>
-            <p>{user.email}</p>
-          </div>
-
-          {user.bio && (
+    <>
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex justify-between items-start">
             <div>
-              <label className="font-medium">Bio</label>
-              <p>{user.bio}</p>
+              <h2 className="text-2xl font-bold">{user.name}</h2>
+              <p className="text-muted-foreground">@{user.username}</p>
             </div>
-          )}
-
-          <div className="flex gap-4 text-sm text-muted-foreground">
-            <div>Following: {user.followingCount}/200</div>
-            <div>Followers: {user.followerCount}/200</div>
+            {isOwnProfile && onEdit && (
+              <Button onClick={onEdit} variant="outline" size="sm">
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+            )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+
+          <div className="space-y-2">
+            <div>
+              <label className="font-medium">Email</label>
+              <p>{user.email}</p>
+            </div>
+
+            {user.bio && (
+              <div>
+                <label className="font-medium">Bio</label>
+                <p>{user.bio}</p>
+              </div>
+            )}
+
+            <div className="flex gap-4 text-sm">
+              <button
+                onClick={() => setListType("following")}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Following: {user.followingCount}/200
+              </button>
+              <button
+                onClick={() => setListType("followers")}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Followers: {user.followerCount}/200
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <UserListDrawer
+        open={listType !== null}
+        onClose={() => setListType(null)}
+        title={listType === "followers" ? "Followers" : "Following"}
+        users={listType === "followers" ? followers : following}
+        isLoading={listType === "followers" ? isFollowersLoading : isFollowingLoading}
+      />
+    </>
   );
 }
 
