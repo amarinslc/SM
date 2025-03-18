@@ -38,13 +38,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      console.log('Profile update request:', req.body);
+      console.log('Profile update request body:', req.body);
+      console.log('Content-Type:', req.headers['content-type']);
 
       // Only allow updating specific fields
       const allowedFields = ['email', 'name', 'bio', 'avatar'];
       const updateData = Object.fromEntries(
-        Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
+        Object.entries(req.body)
+          .filter(([key]) => allowedFields.includes(key))
+          .filter(([_, value]) => value !== undefined)
       );
+
+      console.log('Filtered update data:', updateData);
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).send("No valid data provided for update");
+      }
 
       const updatedUser = await storage.updateUser(req.user!.id, updateData);
       console.log('Profile updated successfully:', updatedUser);
