@@ -38,13 +38,14 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
-      console.log('Profile update request:', data);
-
+      // Prepare update data with all fields
       const updateData = {
-        name: data.name,
-        email: data.email,
-        bio: data.bio
+        name: data.name.trim(),
+        email: data.email.trim(),
+        bio: data.bio?.trim() || ""  // Always include bio, even if empty
       };
+
+      console.log('Sending profile update:', updateData);
 
       const response = await apiRequest("PATCH", "/api/user/profile", {
         headers: {
@@ -57,6 +58,9 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
         const error = await response.text();
         throw new Error(error || 'Failed to update profile');
       }
+
+      const updatedUser = await response.json();
+      console.log('Profile updated successfully:', updatedUser);
 
       // Invalidate user queries to refresh the data
       await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
