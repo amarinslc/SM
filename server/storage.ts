@@ -88,6 +88,16 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Already following this user");
     }
 
+    // Check if the follow limit has been reached (150)
+    const [follower] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, followerIdInt));
+
+    if (follower.followingCount >= 150) {
+      throw new Error("You have reached the maximum number of follows (150)");
+    }
+
     // Start a transaction to ensure consistency
     await db.transaction(async (tx) => {
       // Create follow relationship

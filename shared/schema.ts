@@ -5,11 +5,11 @@ import { z } from "zod";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(),
+  email: text("email").notNull().unique(), // Added unique constraint
   password: text("password").notNull(),
   name: text("name").notNull(),
   bio: text("bio"),
-  avatar: text("avatar"),
+  photo: text("photo"), // Changed from avatar to photo
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
 });
@@ -42,7 +42,7 @@ export const insertUserSchema = createInsertSchema(users)
     password: true,
     name: true,
     bio: true,
-    avatar: true,
+    photo:true,
   })
   .extend({
     email: z.string().email("Invalid email address"),

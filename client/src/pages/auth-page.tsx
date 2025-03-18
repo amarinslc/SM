@@ -45,7 +45,6 @@ export default function AuthPage() {
       password: "",
       name: "",
       bio: "",
-      avatar: "",
     },
   });
 
@@ -61,14 +60,10 @@ export default function AuthPage() {
           <p className="text-lg opacity-90 mb-6">
             Connect to no more than 150 people. No AI. No Ads. No influencers.
           </p>
-          <div className="grid grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="bg-white/10 p-4 rounded-lg text-center">
               <div className="font-bold text-2xl">150</div>
               <div>Connection Limit</div>
-            </div>
-            <div className="bg-white/10 p-4 rounded-lg text-center">
-              <div className="font-bold text-2xl">100%</div>
-              <div>Real People</div>
             </div>
             <div className="bg-white/10 p-4 rounded-lg text-center">
               <div className="font-bold text-2xl">0</div>
@@ -150,9 +145,10 @@ export default function AuthPage() {
                 <Form {...registerForm}>
                   <form
                     onSubmit={registerForm.handleSubmit((data) =>
-                      registerMutation.mutate(data)
+                      registerMutation.mutate({ ...data, photo: data.photo })
                     )}
                     className="space-y-4"
+                    encType="multipart/form-data"
                   >
                     <FormField
                       control={registerForm.control}
@@ -221,12 +217,20 @@ export default function AuthPage() {
                     />
                     <FormField
                       control={registerForm.control}
-                      name="avatar"
-                      render={({ field }) => (
+                      name="photo"
+                      render={({ field: { onChange, ...field } }) => (
                         <FormItem>
-                          <FormLabel>Avatar URL</FormLabel>
+                          <FormLabel>Profile Photo</FormLabel>
                           <FormControl>
-                            <Input {...field} placeholder="https://..." />
+                            <Input 
+                              type="file" 
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) onChange(file);
+                              }}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
