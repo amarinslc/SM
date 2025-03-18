@@ -9,7 +9,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name").notNull(),
   bio: text("bio"),
-  photo: text("photo"), // Changed from avatar to photo
+  photo: text("photo").default(""), // Added default value
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
 });
