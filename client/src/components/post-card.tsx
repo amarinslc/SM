@@ -60,19 +60,17 @@ export function PostCard({ post }: PostCardProps) {
     <Card className="w-full">
       <CardHeader className="flex-row space-x-4 items-center">
         <Link href={`/profile/${author.id}`}>
-          <a>
-            <Avatar>
-              <AvatarImage src={author.avatar || undefined} />
-              <AvatarFallback>{author.name[0]}</AvatarFallback>
-            </Avatar>
-          </a>
+          <Avatar className="cursor-pointer">
+            <AvatarImage src={author.photo || undefined} />
+            <AvatarFallback>{author.name[0].toUpperCase()}</AvatarFallback>
+          </Avatar>
         </Link>
         <div className="flex flex-col">
           <Link href={`/profile/${author.id}`}>
             <a className="font-semibold hover:underline">{author.name}</a>
           </Link>
           <span className="text-sm text-muted-foreground">
-            {formatDistanceToNow(post.createdAt || new Date(), { addSuffix: true })}
+            {formatDistanceToNow(new Date(post.createdAt || new Date()), { addSuffix: true })}
           </span>
         </div>
       </CardHeader>

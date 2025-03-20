@@ -9,6 +9,7 @@ import { useParams } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { PostCard } from "@/components/post-card";
 import { UserListDrawer } from "@/components/user-list-drawer";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 type ListType = "followers" | "following" | null;
 
@@ -31,9 +32,15 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold">{user.name}</h2>
-              <p className="text-muted-foreground">@{user.username}</p>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={user.photo || undefined} />
+                <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div>
+                <h2 className="text-2xl font-bold">{user.name}</h2>
+                <p className="text-muted-foreground">@{user.username}</p>
+              </div>
             </div>
             {isOwnProfile && onEdit && (
               <Button onClick={onEdit} variant="outline" size="sm">
@@ -61,13 +68,13 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
                 onClick={() => setListType("following")}
                 className="text-muted-foreground hover:text-foreground"
               >
-                Following: {user.followingCount}/200
+                Following: {user.followingCount}/150
               </button>
               <button
                 onClick={() => setListType("followers")}
                 className="text-muted-foreground hover:text-foreground"
               >
-                Followers: {user.followerCount}/200
+                Followers: {user.followerCount}
               </button>
             </div>
           </div>
@@ -121,8 +128,8 @@ export function ProfilePage() {
         {isEditing && isOwnProfile ? (
           <>
             <ProfileEditor user={user} onSuccess={() => setIsEditing(false)} />
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="mt-4"
               onClick={() => setIsEditing(false)}
             >
@@ -130,10 +137,10 @@ export function ProfilePage() {
             </Button>
           </>
         ) : (
-          <ProfileView 
-            user={user} 
+          <ProfileView
+            user={user}
             onEdit={isOwnProfile ? () => setIsEditing(true) : undefined}
-            isOwnProfile={isOwnProfile}
+            isOwnProfile={!!isOwnProfile}
           />
         )}
 
