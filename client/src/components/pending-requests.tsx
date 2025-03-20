@@ -24,10 +24,19 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
       await apiRequest("POST", `/api/users/requests/${followerId}/accept`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
-      // Invalidate the requests query to remove the approved request
-      queryClient.invalidateQueries({ queryKey: ["/api/users", "requests"] });
+      // Use consistent query key pattern for invalidation
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/users"],
+        refetchType: "all" 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/feed"],
+        refetchType: "all"
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/users", "requests"],
+        refetchType: "all"
+      });
       toast({ title: "Follow request accepted" });
     },
   });
@@ -37,9 +46,15 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
       await apiRequest("POST", `/api/users/requests/${followerId}/reject`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      // Invalidate the requests query to remove the rejected request
-      queryClient.invalidateQueries({ queryKey: ["/api/users", "requests"] });
+      // Use consistent query key pattern for invalidation
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/users"],
+        refetchType: "all"
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/users", "requests"],
+        refetchType: "all"
+      });
       toast({ title: "Follow request rejected" });
     },
   });

@@ -28,7 +28,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     mutationFn: async () => {
       const endpoint = isFollowing ? "unfollow" : "follow";
       const response = await apiRequest("POST", `/api/users/${user.id}/${endpoint}`);
-      return response.json();
+      return isFollowing ? undefined : response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
@@ -40,7 +40,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/requests`] });
 
       toast({
-        title: isFollowing ? "Unfollowed" : data.message,
+        title: isFollowing ? "Unfollowed" : data?.message ?? "Following",
         description: isFollowing
           ? `You unfollowed ${user.name}`
           : user.isPrivate 
