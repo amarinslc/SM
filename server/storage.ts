@@ -23,6 +23,9 @@ export interface IStorage {
   searchUsers(query: string): Promise<User[]>;
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
+  getPendingFollowRequests(userId: number): Promise<any[]>;
+  acceptFollowRequest(requestId: number): Promise<void>;
+  rejectFollowRequest(requestId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -288,6 +291,20 @@ export class DatabaseStorage implements IStorage {
     }
 
     return updatedUser;
+  }
+  async getPendingFollowRequests(userId: number): Promise<any[]> {
+    // Stub implementation
+    return [];
+  }
+
+  async acceptFollowRequest(requestId: number): Promise<void> {
+    // Stub implementation
+    console.log('Accept follow request stub called with ID:', requestId);
+  }
+
+  async rejectFollowRequest(requestId: number): Promise<void> {
+    // Stub implementation
+    console.log('Reject follow request stub called with ID:', requestId);
   }
 }
 

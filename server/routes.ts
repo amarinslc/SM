@@ -7,6 +7,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import express from 'express';
+import {hashPassword} from './auth';
 
 // Ensure uploads directory exists with proper permissions
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -176,6 +177,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+  app.post("/api/register", upload.single('photo'), async (req, res, next) => {
+    console.log("Register attempt:", req.body.username);
+    console.log("Photo file:", req.file);
+
+    try {
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        console.log("Registration failed: Username exists");
+        return res.status(400).send("Username already exists");
+      }
+
+      const hashedPassword = await hashPassword(req.body.password);
+
+      // Generate photo path if file was uploaded
+      let photoPath = '';
+      if (req.file) {
+        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(req.file.originalname)}`;
+        const filePath = path.join('uploads', filename);
+        await fs.writeFile(path.join(process.cwd(), filePath), req.file.buffer);
+        photoPath = `/uploads/${filename}`;
+      }
+
+      const user = await storage.createUser({
+        ...req.body,
+        password: hashedPassword,
+        photo: photoPath
+      });
+
+      console.log("Registration successful:", user.username);
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json(user);
+      });
+    } catch (error) {
+      console.error("Registration error:", error);
+      res.status(400).send((error as Error).message);
+    }
+  });
 
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

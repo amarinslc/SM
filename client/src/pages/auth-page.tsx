@@ -144,9 +144,18 @@ export default function AuthPage() {
               <CardContent>
                 <Form {...registerForm}>
                   <form
-                    onSubmit={registerForm.handleSubmit((data) =>
-                      registerMutation.mutate({ ...data, photo: data.photo })
-                    )}
+                    onSubmit={registerForm.handleSubmit((data) => {
+                      const formData = new FormData();
+                      Object.entries(data).forEach(([key, value]) => {
+                        if (key === 'photo' && value instanceof File) {
+                          formData.append('photo', value);
+                        } else if (value !== undefined && value !== null) {
+                          formData.append(key, value.toString());
+                        }
+                      });
+
+                      registerMutation.mutate(formData);
+                    })}
                     className="space-y-4"
                     encType="multipart/form-data"
                   >
@@ -222,8 +231,8 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Profile Photo</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="file" 
+                            <Input
+                              type="file"
                               accept="image/*"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];

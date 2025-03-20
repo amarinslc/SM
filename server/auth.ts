@@ -15,13 +15,13 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+export async function comparePasswords(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -69,27 +69,6 @@ export function setupAuth(app: Express) {
   passport.deserializeUser(async (id: number, done) => {
     const user = await storage.getUser(id);
     done(null, user);
-  });
-
-  app.post("/api/register", async (req, res, next) => {
-    console.log("Register attempt:", req.body.username);
-    const existingUser = await storage.getUserByUsername(req.body.username);
-    if (existingUser) {
-      console.log("Registration failed: Username exists");
-      return res.status(400).send("Username already exists");
-    }
-
-    const hashedPassword = await hashPassword(req.body.password);
-    const user = await storage.createUser({
-      ...req.body,
-      password: hashedPassword,
-    });
-
-    console.log("Registration successful:", user.username);
-    req.login(user, (err) => {
-      if (err) return next(err);
-      res.status(201).json(user);
-    });
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
