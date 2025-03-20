@@ -249,16 +249,14 @@ export class DatabaseStorage implements IStorage {
     const following = await this.getFollowing(userId);
     const followingIds = following.map((u) => u.id);
 
-    // Only get posts from followed users and own posts
+    // Only get posts from followed users
     const feed = await db
       .select()
       .from(posts)
       .where(
-        or(
-          eq(posts.userId, userId),
-          // Only include posts from users we follow if we have any
-          followingIds.length > 0 ? inArray(posts.userId, followingIds) : sql`false`
-        )
+        followingIds.length > 0 
+          ? inArray(posts.userId, followingIds)
+          : sql`false` // Return empty array if not following anyone
       )
       .orderBy(sql`${posts.createdAt} DESC`);
 
