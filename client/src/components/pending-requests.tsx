@@ -3,8 +3,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 import { Link } from "wouter";
 
 interface PendingRequestsProps {
@@ -26,6 +26,8 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      // Invalidate the requests query to remove the approved request
+      queryClient.invalidateQueries({ queryKey: ["/api/users", "requests"] });
       toast({ title: "Follow request accepted" });
     },
   });
@@ -36,6 +38,8 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+      // Invalidate the requests query to remove the rejected request
+      queryClient.invalidateQueries({ queryKey: ["/api/users", "requests"] });
       toast({ title: "Follow request rejected" });
     },
   });

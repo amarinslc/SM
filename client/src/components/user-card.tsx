@@ -27,19 +27,25 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   const followMutation = useMutation({
     mutationFn: async () => {
       const endpoint = isFollowing ? "unfollow" : "follow";
-      await apiRequest("POST", `/api/users/${user.id}/${endpoint}`);
+      const response = await apiRequest("POST", `/api/users/${user.id}/${endpoint}`);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
       queryClient.invalidateQueries({
         queryKey: [`/api/users/${currentUser?.id}/following`],
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      // Also invalidate requests query to handle pending state
+      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/requests`] });
+
       toast({
-        title: isFollowing ? "Unfollowed" : "Follow request sent",
+        title: isFollowing ? "Unfollowed" : data.message,
         description: isFollowing
           ? `You unfollowed ${user.name}`
-          : `Your follow request has been sent to ${user.name}`,
+          : user.isPrivate 
+            ? `Your follow request has been sent to ${user.name}`
+            : `You are now following ${user.name}`,
       });
     },
     onError: (error: Error) => {
@@ -58,7 +64,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       <CardHeader className="flex-row items-center gap-4">
         <Avatar className="h-12 w-12">
           <AvatarImage src={user.photo || undefined} />
-          <AvatarFallback>{(user.name || "?")[0].toUpperCase()}</AvatarFallback>
+          <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
           <span className="font-semibold">{user.name}</span>
