@@ -10,6 +10,7 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User>;
   followUser(followerId: number, followingId: number): Promise<void>;
@@ -48,6 +49,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
   async searchUsers(query: string): Promise<User[]> {
     // This will search all users with case-insensitive partial matches
     return db.select().from(users).where(
@@ -59,6 +65,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
+    // Check for existing username
+    const existingUsername = await this.getUserByUsername(user.username);
+    if (existingUsername) {
+      throw new Error("Username already exists");
+    }
+
+    // Check for existing email
+    const existingEmail = await this.getUserByEmail(user.email);
+    if (existingEmail) {
+      throw new Error("Email already exists");
+    }
+
     const [newUser] = await db.insert(users).values(user).returning();
     return newUser;
   }
@@ -76,6 +94,16 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Invalid user IDs");
     }
 
+    // Check if the target user exists
+    const [targetUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, followingIdInt));
+
+    if (!targetUser) {
+      throw new Error("Target user not found");
+    }
+
     // Check if already following
     const [existing] = await db
       .select()
@@ -91,11 +119,15 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Already following this user");
     }
 
-    // Check if the follow limit has been reached (150)
+    // Get follower user and check limits
     const [follower] = await db
       .select()
       .from(users)
       .where(eq(users.id, followerIdInt));
+
+    if (!follower) {
+      throw new Error("Follower user not found");
+    }
 
     if (follower.followingCount >= 150) {
       throw new Error("You have reached the maximum number of follows (150)");
@@ -124,21 +156,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async unfollowUser(followerId: number, followingId: number): Promise<void> {
+    // Check if the relationship exists first
+    const [existing] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
+        )
+      );
+
+    if (!existing) {
+      throw new Error("Not following this user");
+    }
+
     await db.transaction(async (tx) => {
       // Remove follow relationship
-      const [deletedFollow] = await tx
+      await tx
         .delete(follows)
         .where(
           and(
             eq(follows.followerId, followerId),
             eq(follows.followingId, followingId)
           )
-        )
-        .returning();
-
-      if (!deletedFollow) {
-        throw new Error("Not following this user");
-      }
+        );
 
       // Update follower count using SQL expression
       await tx

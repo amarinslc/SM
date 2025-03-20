@@ -14,20 +14,28 @@ const uploadsDir = path.join(process.cwd(), 'uploads');
 try {
   await fs.access(uploadsDir);
 } catch {
-  await fs.mkdir(uploadsDir, { recursive: true });
+  await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
 }
 
+// Configure multer with improved error handling
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      cb(null, uploadsDir);
+    },
+    filename: (_req, file, cb) => {
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+      cb(null, `${uniqueSuffix}-${file.originalname}`);
+    },
+  }),
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(null, false);
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
+      return cb(new Error('Only image files are allowed!'));
     }
+    cb(null, true);
   }
 });
 
@@ -35,24 +43,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
   // Add new profile update endpoint
-  app.patch("/api/user/profile", async (req, res) => {
+  app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       console.log('Profile update request body:', req.body);
-      console.log('Content-Type:', req.headers['content-type']);
+      console.log('Profile photo:', req.file);
 
       // Only allow updating specific fields
-      const allowedFields = ['email', 'name', 'bio', 'avatar'];
+      const allowedFields = ['email', 'name', 'bio', 'photo'];
       const updateData = Object.fromEntries(
         Object.entries(req.body)
           .filter(([key]) => allowedFields.includes(key))
           .filter(([_, value]) => value !== undefined)
       );
 
+      // Handle photo upload
+      if (req.file) {
+        updateData.photo = `/uploads/${req.file.filename}`;
+      }
+
       console.log('Filtered update data:', updateData);
 
-      if (Object.keys(updateData).length === 0) {
+      if (Object.keys(updateData).length === 0 && !req.file) {
         return res.status(400).send("No valid data provided for update");
       }
 
@@ -183,10 +196,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log("Photo file:", req.file);
 
     try {
+      // Check for existing username
       const existingUser = await storage.getUserByUsername(req.body.username);
       if (existingUser) {
         console.log("Registration failed: Username exists");
         return res.status(400).send("Username already exists");
+      }
+
+      // Check for existing email
+      const existingEmail = await storage.getUserByEmail(req.body.email);
+      if (existingEmail) {
+        console.log("Registration failed: Email exists");
+        return res.status(400).send("Email already exists");
       }
 
       const hashedPassword = await hashPassword(req.body.password);
@@ -194,10 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate photo path if file was uploaded
       let photoPath = '';
       if (req.file) {
-        const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(req.file.originalname)}`;
-        const filePath = path.join('uploads', filename);
-        await fs.writeFile(path.join(process.cwd(), filePath), req.file.buffer);
-        photoPath = `/uploads/${filename}`;
+        photoPath = `/uploads/${req.file.filename}`;
       }
 
       const user = await storage.createUser({

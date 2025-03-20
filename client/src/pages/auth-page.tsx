@@ -24,7 +24,11 @@ import { useForm } from "react-hook-form";
 import { Redirect } from "wouter";
 import { z } from "zod";
 
-const loginSchema = insertUserSchema.pick({ username: true, password: true });
+// Create a separate login schema
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -43,8 +47,10 @@ export default function AuthPage() {
       username: "",
       email: "",
       password: "",
+      confirmPassword: "",
       name: "",
       bio: "",
+      photo: null,
     },
   });
 
@@ -213,6 +219,19 @@ export default function AuthPage() {
                     />
                     <FormField
                       control={registerForm.control}
+                      name="confirmPassword"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Confirm Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={registerForm.control}
                       name="bio"
                       render={({ field }) => (
                         <FormItem>
@@ -227,7 +246,7 @@ export default function AuthPage() {
                     <FormField
                       control={registerForm.control}
                       name="photo"
-                      render={({ field: { onChange, ...field } }) => (
+                      render={({ field: { value, onChange, ...field } }) => (
                         <FormItem>
                           <FormLabel>Profile Photo</FormLabel>
                           <FormControl>
