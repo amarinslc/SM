@@ -11,11 +11,14 @@ export const users = pgTable("users", {
   photo: text("photo").default(""),
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
+  isPrivate: boolean("is_private").default(true),
 });
 
 export const follows = pgTable("follows", {
   followerId: integer("follower_id").notNull(),
   followingId: integer("following_id").notNull(),
+  isPending: boolean("is_pending").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const posts = pgTable("posts", {
@@ -34,7 +37,6 @@ export const comments = pgTable("comments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Define a schema for InsertUser to ensure proper structure and type safety
 export const insertUserSchema = z.object({
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email address"),
@@ -42,7 +44,8 @@ export const insertUserSchema = z.object({
   confirmPassword: z.string(),
   name: z.string().min(1, "Name is required"),
   bio: z.string(),
-  photo: z.any(), 
+  photo: z.any(),
+  isPrivate: z.boolean().default(true),
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

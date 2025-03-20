@@ -25,8 +25,8 @@ export interface IStorage {
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
   getPendingFollowRequests(userId: number): Promise<any[]>;
-  acceptFollowRequest(requestId: number): Promise<void>;
-  rejectFollowRequest(requestId: number): Promise<void>;
+  acceptFollowRequest(followerId: number, followingId: number): Promise<void>;
+  rejectFollowRequest(followerId: number, followingId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -116,7 +116,7 @@ export class DatabaseStorage implements IStorage {
       );
 
     if (existing) {
-      throw new Error("Already following this user");
+      throw new Error("Already following or requested to follow this user");
     }
 
     // Get follower user and check limits
@@ -139,19 +139,23 @@ export class DatabaseStorage implements IStorage {
       await tx.insert(follows).values({
         followerId: followerIdInt,
         followingId: followingIdInt,
+        isPending: targetUser.isPrivate, // Set pending if account is private
       });
 
-      // Update follower count
-      await tx
-        .update(users)
-        .set({ followingCount: sql`${users.followingCount} + 1` })
-        .where(eq(users.id, followerIdInt));
+      // Only update counts if the account is not private
+      if (!targetUser.isPrivate) {
+        // Update follower count
+        await tx
+          .update(users)
+          .set({ followingCount: sql`${users.followingCount} + 1` })
+          .where(eq(users.id, followerIdInt));
 
-      // Update following count
-      await tx
-        .update(users)
-        .set({ followerCount: sql`${users.followerCount} + 1` })
-        .where(eq(users.id, followingIdInt));
+        // Update following count
+        await tx
+          .update(users)
+          .set({ followerCount: sql`${users.followerCount} + 1` })
+          .where(eq(users.id, followingIdInt));
+      }
     });
   }
 
@@ -185,16 +189,16 @@ export class DatabaseStorage implements IStorage {
       // Update follower count using SQL expression
       await tx
         .update(users)
-        .set({ 
-          followingCount: sql`GREATEST(${users.followingCount} - 1, 0)` 
+        .set({
+          followingCount: sql`GREATEST(${users.followingCount} - 1, 0)`
         })
         .where(eq(users.id, followerId));
 
       // Update following count
       await tx
         .update(users)
-        .set({ 
-          followerCount: sql`GREATEST(${users.followerCount} - 1, 0)` 
+        .set({
+          followerCount: sql`GREATEST(${users.followerCount} - 1, 0)`
         })
         .where(eq(users.id, followingId));
     });
@@ -206,7 +210,12 @@ export class DatabaseStorage implements IStorage {
         follower: users,
       })
       .from(follows)
-      .where(eq(follows.followingId, userId))
+      .where(
+        and(
+          eq(follows.followingId, userId),
+          eq(follows.isPending, false)
+        )
+      )
       .innerJoin(users, eq(users.id, follows.followerId));
 
     return followData.map((d) => d.follower);
@@ -218,7 +227,12 @@ export class DatabaseStorage implements IStorage {
         following: users,
       })
       .from(follows)
-      .where(eq(follows.followerId, userId))
+      .where(
+        and(
+          eq(follows.followerId, userId),
+          eq(follows.isPending, false)
+        )
+      )
       .innerJoin(users, eq(users.id, follows.followingId));
 
     return followData.map((d) => d.following);
@@ -245,25 +259,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeed(userId: number): Promise<Post[]> {
-    // Get users that the current user follows
-    const following = await this.getFollowing(userId);
-    console.log(`User ${userId} follows ${following.length} users:`, following.map(u => u.id));
-    const followingIds = following.map((u) => u.id);
+    // Get users that the current user follows and are not pending
+    const following = await db
+      .select({
+        following: users,
+      })
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, userId),
+          eq(follows.isPending, false)
+        )
+      )
+      .innerJoin(users, eq(users.id, follows.followingId));
+
+    const followingIds = following.map((f) => f.following.id);
 
     // If not following anyone, return empty feed
     if (followingIds.length === 0) {
-      console.log(`User ${userId} follows no one, returning empty feed`);
       return [];
     }
 
-    // Only get posts from followed users
+    // Only get posts from accepted follows
     const feed = await db
       .select()
       .from(posts)
       .where(inArray(posts.userId, followingIds))
       .orderBy(sql`${posts.createdAt} DESC`);
 
-    console.log(`Found ${feed.length} posts from followed users:`, feed.map(p => ({ userId: p.userId, content: p.content.substring(0, 20) })));
     return feed;
   }
 
@@ -337,18 +360,60 @@ export class DatabaseStorage implements IStorage {
     return updatedUser;
   }
   async getPendingFollowRequests(userId: number): Promise<any[]> {
-    // Stub implementation
-    return [];
+    const requests = await db
+      .select({
+        id: follows.followerId,
+        follower: users,
+        createdAt: follows.createdAt,
+      })
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followingId, userId),
+          eq(follows.isPending, true)
+        )
+      )
+      .innerJoin(users, eq(users.id, follows.followerId));
+
+    return requests;
   }
 
-  async acceptFollowRequest(requestId: number): Promise<void> {
-    // Stub implementation
-    console.log('Accept follow request stub called with ID:', requestId);
+  async acceptFollowRequest(followerId: number, followingId: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      // Update follow status
+      await tx
+        .update(follows)
+        .set({ isPending: false })
+        .where(
+          and(
+            eq(follows.followerId, followerId),
+            eq(follows.followingId, followingId)
+          )
+        );
+
+      // Update follower count
+      await tx
+        .update(users)
+        .set({ followingCount: sql`${users.followingCount} + 1` })
+        .where(eq(users.id, followerId));
+
+      // Update following count
+      await tx
+        .update(users)
+        .set({ followerCount: sql`${users.followerCount} + 1` })
+        .where(eq(users.id, followingId));
+    });
   }
 
-  async rejectFollowRequest(requestId: number): Promise<void> {
-    // Stub implementation
-    console.log('Reject follow request stub called with ID:', requestId);
+  async rejectFollowRequest(followerId: number, followingId: number): Promise<void> {
+    await db
+      .delete(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
+        )
+      );
   }
 }
 

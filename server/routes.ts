@@ -51,7 +51,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Profile photo:', req.file);
 
       // Only allow updating specific fields
-      const allowedFields = ['email', 'name', 'bio', 'photo'];
+      const allowedFields = ['email', 'name', 'bio', 'photo', 'isPrivate'];
       const updateData = Object.fromEntries(
         Object.entries(req.body)
           .filter(([key]) => allowedFields.includes(key))
@@ -107,6 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/users/:id/follow", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+
     try {
       const targetId = parseInt(req.params.id);
       if (isNaN(targetId)) {
@@ -119,7 +120,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.followUser(req.user!.id, targetId);
-      res.sendStatus(200);
+
+      // Return different message based on account privacy
+      if (targetUser.isPrivate) {
+        res.status(202).json({ message: "Follow request sent" });
+      } else {
+        res.status(200).json({ message: "Following" });
+      }
     } catch (error) {
       console.error("Follow error:", error);
       res.status(400).send((error as Error).message);
@@ -150,20 +157,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const requests = await storage.getPendingFollowRequests(parseInt(req.params.id));
-
-      // Get full user information for each requester
-      const requestsWithUsers = await Promise.all(
-        requests.map(async (request) => {
-          const requester = await storage.getUser(request.requesterId);
-          return {
-            ...request,
-            requester
-          };
-        })
-      );
-
-      console.log("Sending follow requests:", requests);
-      res.json(requestsWithUsers);
+      res.json(requests);
     } catch (error) {
       console.error("Error getting requests:", error);
       res.status(500).json({ error: "Failed to get requests" });
@@ -173,7 +167,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/requests/:id/accept", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      await storage.acceptFollowRequest(parseInt(req.params.id));
+      await storage.acceptFollowRequest(parseInt(req.params.id), req.user!.id);
       res.sendStatus(200);
     } catch (error) {
       res.status(400).send((error as Error).message);
@@ -183,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/users/requests/:id/reject", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
-      await storage.rejectFollowRequest(parseInt(req.params.id));
+      await storage.rejectFollowRequest(parseInt(req.params.id), req.user!.id);
       res.sendStatus(200);
     } catch (error) {
       res.status(400).send((error as Error).message);
@@ -221,7 +215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.createUser({
         ...req.body,
         password: hashedPassword,
-        photo: photoPath
+        photo: photoPath,
+        isPrivate: true // Set default privacy to true
       });
 
       console.log("Registration successful:", user.username);
