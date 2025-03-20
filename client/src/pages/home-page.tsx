@@ -7,12 +7,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, LogOut, Search, User as UserIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebounce(searchQuery, 300); // Debounce search by 300ms
 
   const { data: feed, isLoading: isFeedLoading } = useQuery<Post[]>({
     queryKey: ["/api/feed"],
@@ -23,25 +25,19 @@ export default function HomePage() {
   });
 
   const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
-    queryKey: ["/api/users/search"],
+    queryKey: ["/api/users/search", debouncedSearch],
     queryFn: async () => {
-      if (!searchQuery) return [];
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQuery)}`, {
+      if (!debouncedSearch.trim()) return [];
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(debouncedSearch)}`, {
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Search failed');
       return await res.json();
     },
-    enabled: searchQuery.length > 0,
+    enabled: debouncedSearch.trim().length > 0,
   });
 
   if (!user) return null;
-
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    console.log('Search query:', value);
-    setSearchQuery(value);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,14 +46,14 @@ export default function HomePage() {
           <h1 className="text-2xl font-bold">Dunbar</h1>
           <div className="flex items-center gap-4">
             <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
               <Input
                 type="search"
                 placeholder="Search users..."
-                className="w-64"
+                className="w-64 pl-9"
                 value={searchQuery}
-                onChange={handleSearch}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <Search className="absolute right-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
             </div>
             <Link href="/profile">
               <Button variant="ghost" size="icon">
@@ -113,7 +109,7 @@ export default function HomePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground">No posts in your feed</p>
+              <p className="text-center text-muted-foreground">No posts in your feed. Follow some users to see their posts!</p>
             )}
           </div>
 
@@ -121,9 +117,9 @@ export default function HomePage() {
             <div className="rounded-lg bg-card p-4">
               <h2 className="font-semibold mb-2">Your Network</h2>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div>Following: {user.followingCount}/200</div>
+                <div>Following: {user.followingCount}/150</div>
                 <div className="w-px h-4 bg-border" />
-                <div>Followers: {user.followerCount}/200</div>
+                <div>Followers: {user.followerCount}</div>
               </div>
             </div>
 
