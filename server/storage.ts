@@ -247,19 +247,23 @@ export class DatabaseStorage implements IStorage {
   async getFeed(userId: number): Promise<Post[]> {
     // Get users that the current user follows
     const following = await this.getFollowing(userId);
+    console.log(`User ${userId} follows ${following.length} users:`, following.map(u => u.id));
     const followingIds = following.map((u) => u.id);
+
+    // If not following anyone, return empty feed
+    if (followingIds.length === 0) {
+      console.log(`User ${userId} follows no one, returning empty feed`);
+      return [];
+    }
 
     // Only get posts from followed users
     const feed = await db
       .select()
       .from(posts)
-      .where(
-        followingIds.length > 0 
-          ? inArray(posts.userId, followingIds)
-          : sql`false` // Return empty array if not following anyone
-      )
+      .where(inArray(posts.userId, followingIds))
       .orderBy(sql`${posts.createdAt} DESC`);
 
+    console.log(`Found ${feed.length} posts from followed users:`, feed.map(p => ({ userId: p.userId, content: p.content.substring(0, 20) })));
     return feed;
   }
 
