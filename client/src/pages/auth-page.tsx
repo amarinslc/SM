@@ -246,7 +246,7 @@ export default function AuthPage() {
                     <FormField
                       control={registerForm.control}
                       name="photo"
-                      render={({ field: { onChange, ...field } }) => (
+                      render={({ field }) => (
                         <FormItem>
                           <FormLabel>Profile Photo</FormLabel>
                           <FormControl>
@@ -255,9 +255,9 @@ export default function AuthPage() {
                               accept="image/*"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) onChange(file);
+                                if (file) field.onChange(file);
                               }}
-                              {...field}
+                              className="cursor-pointer"
                             />
                           </FormControl>
                           <FormMessage />
