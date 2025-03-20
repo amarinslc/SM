@@ -1,20 +1,21 @@
 import { PostCard } from "@/components/post-card";
 import { PostForm } from "@/components/post-form";
 import { UserCard } from "@/components/user-card";
+import { PendingRequests } from "@/components/pending-requests";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, LogOut, Search, User as UserIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link } from "wouter";
 import { useDebounce } from "@/hooks/use-debounce";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearch = useDebounce(searchQuery, 300); // Debounce search by 300ms
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
   const { data: feed, isLoading: isFeedLoading } = useQuery<Post[]>({
     queryKey: ["/api/feed"],
@@ -22,6 +23,11 @@ export default function HomePage() {
 
   const { data: following, isLoading: isFollowingLoading } = useQuery<User[]>({
     queryKey: [`/api/users/${user?.id}/following`],
+  });
+
+  const { data: requests, isLoading: isRequestsLoading } = useQuery({
+    queryKey: [`/api/users/${user?.id}/requests`],
+    enabled: !!user?.id,
   });
 
   const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
@@ -122,6 +128,10 @@ export default function HomePage() {
                 <div>Followers: {user.followerCount}</div>
               </div>
             </div>
+
+            {!isRequestsLoading && requests && requests.length > 0 && (
+              <PendingRequests requests={requests} />
+            )}
 
             <div className="space-y-4">
               <h2 className="font-semibold">People You Follow</h2>

@@ -18,15 +18,11 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   const { toast } = useToast();
 
   const { data: followRequests } = useQuery({
-    queryKey: [`/api/users/${user.id}/requests`],
-    enabled: currentUser?.id === user.id,
+    queryKey: [`/api/users/${currentUser?.id}/requests`],
+    enabled: !!currentUser?.id,
   });
 
-  const { data: following } = useQuery<User[]>({
-    queryKey: [`/api/users/${currentUser?.id}/following`],
-  });
-
-  const hasPendingRequest = followRequests?.some((f) => f.requesterId === currentUser?.id) ?? false;
+  const hasPendingRequest = followRequests?.some((request) => request.follower.id === user.id) ?? false;
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -40,10 +36,10 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       toast({
-        title: isFollowing ? "Unfollowed" : "Following",
+        title: isFollowing ? "Unfollowed" : "Follow request sent",
         description: isFollowing
           ? `You unfollowed ${user.name}`
-          : `You are now following ${user.name}`,
+          : `Your follow request has been sent to ${user.name}`,
       });
     },
     onError: (error: Error) => {
@@ -55,37 +51,13 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     },
   });
 
-  const acceptRequestMutation = useMutation({
-    mutationFn: async (requestId: number) => {
-      await apiRequest("POST", `/api/users/requests/${requestId}/accept`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}/requests`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/followers`] });
-      toast({
-        title: "Follow request accepted",
-        description: "User can now see your posts",
-      });
-    },
-  });
-
-  const rejectRequestMutation = useMutation({
-    mutationFn: async (requestId: number) => {
-      await apiRequest("POST", `/api/users/requests/${requestId}/reject`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}/requests`] });
-      toast({
-        title: "Follow request rejected",
-      });
-    },
-  });
+  if (currentUser?.id === user.id) return null;
 
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-4">
         <Avatar className="h-12 w-12">
-          <AvatarImage src={user.avatar || undefined} />
+          <AvatarImage src={user.photo || undefined} />
           <AvatarFallback>{(user.name || "?")[0].toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="flex flex-col">
@@ -105,60 +77,22 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
             <span className="text-sm text-muted-foreground ml-1">following</span>
           </div>
         </div>
-        {currentUser?.id !== user.id && (
-          <Button
-            variant={isFollowing ? "outline" : "default"}
-            className="w-full mt-4"
-            onClick={() => followMutation.mutate()}
-            disabled={followMutation.isPending || hasPendingRequest}
-          >
-            {followMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : hasPendingRequest ? (
-              "Request Pending"
-            ) : isFollowing ? (
-              "Unfollow"
-            ) : (
-              "Follow"
-            )}
-          </Button>
-        )}
-        {currentUser?.id === user.id && followRequests && followRequests.length > 0 && (
-          <div className="mt-4 space-y-2">
-            <h3 className="font-semibold">Follow Requests</h3>
-            {followRequests.map((request) => (
-              <div key={request.id} className="flex items-center justify-between border-b py-2">
-                <div className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={request.requester?.avatar || undefined} />
-                    <AvatarFallback>{request.requester?.name[0].toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="font-semibold text-sm">{request.requester?.name}</div>
-                    <div className="text-xs text-muted-foreground">@{request.requester?.username}</div>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => acceptRequestMutation.mutate(request.id)}
-                    disabled={acceptRequestMutation.isPending}
-                  >
-                    Accept
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => rejectRequestMutation.mutate(request.id)}
-                    disabled={rejectRequestMutation.isPending}
-                  >
-                    Reject
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <Button
+          variant={isFollowing ? "outline" : "default"}
+          className="w-full mt-4"
+          onClick={() => followMutation.mutate()}
+          disabled={followMutation.isPending || hasPendingRequest}
+        >
+          {followMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : hasPendingRequest ? (
+            "Request Pending"
+          ) : isFollowing ? (
+            "Unfollow"
+          ) : (
+            "Follow"
+          )}
+        </Button>
       </CardContent>
     </Card>
   );
