@@ -1,15 +1,14 @@
 import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  email: text("email").notNull().unique(), // Added unique constraint
+  email: text("email").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
   bio: text("bio"),
-  photo: text("photo").default(""), // Added default value
+  photo: text("photo").default(""),
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
 });
@@ -35,32 +34,15 @@ export const comments = pgTable("comments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users)
-  .pick({
-    username: true,
-    email: true,
-    password: true,
-    name: true,
-    bio: true,
-    photo:true,
-  })
-  .extend({
-    email: z.string().email("Invalid email address"),
-    password: z.string().min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
-
-export const insertPostSchema = createInsertSchema(posts).pick({
-  content: true,
-  media: true,
-});
-
-export const insertCommentSchema = createInsertSchema(comments).pick({
-  content: true,
+// Define a schema for InsertUser to ensure proper structure and type safety
+export const insertUserSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+  name: z.string().min(1, "Name is required"),
+  bio: z.string(),
+  photo: z.any(), 
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -50,7 +50,7 @@ export default function AuthPage() {
       confirmPassword: "",
       name: "",
       bio: "",
-      photo: null,
+      photo: undefined,
     },
   });
 
@@ -246,7 +246,7 @@ export default function AuthPage() {
                     <FormField
                       control={registerForm.control}
                       name="photo"
-                      render={({ field: { value, onChange, ...field } }) => (
+                      render={({ field: { onChange, ...field } }) => (
                         <FormItem>
                           <FormLabel>Profile Photo</FormLabel>
                           <FormControl>
