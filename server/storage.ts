@@ -278,14 +278,10 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
-    const followingIds = following.map((f) => f.followingId);
+    // Get all following IDs plus the user's own ID
+    const followingIds = [...following.map((f) => f.followingId), userId];
 
-    // If not following anyone, return empty feed
-    if (followingIds.length === 0) {
-      return [];
-    }
-
-    // Get posts only from users being actively followed
+    // Get posts from followed users and own posts
     return db
       .select()
       .from(posts)

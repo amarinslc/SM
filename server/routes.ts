@@ -299,6 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         media
       );
 
+      // Log successful post creation
       console.log('Post created successfully:', post);
       res.status(201).json(post);
     } catch (error) {
