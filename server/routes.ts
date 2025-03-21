@@ -282,14 +282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (files && files.length > 0) {
         for (const file of files) {
-          console.log('Processing file:', file.originalname);
-          const filename = `${Date.now()}-${Math.random().toString(36).substring(7)}${path.extname(file.originalname)}`;
-          const filePath = path.join('uploads', filename);
-
-          await fs.writeFile(path.join(process.cwd(), filePath), file.buffer);
+          console.log('Processing file:', file.originalname, 'mimetype:', file.mimetype);
           media.push({
             type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-            url: `/uploads/${filename}`
+            url: `/uploads/${file.filename}`
           });
         }
       }
