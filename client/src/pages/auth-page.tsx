@@ -62,22 +62,18 @@ export default function AuthPage() {
     <div className="min-h-screen bg-[#FFF1E0] flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden rounded-[2rem] shadow-xl">
         <div className="p-8 bg-[#87BA8E] text-white flex flex-col justify-center">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold mb-4">Dunbar</h1>
+          <div className="text-center mb-12">
+            <img 
+              src="/assets/Vector.png" 
+              alt="Dunbar Logo" 
+              className="w-32 h-32 mx-auto mb-8"
+            />
+            <div className="text-2xl mb-2">
+              only <span className="font-bold">150</span> connections
+            </div>
             <p className="text-lg opacity-90">
-              No more than 150 connections at once...
-              <br />because real relationships matter.
+              because real relationships matter
             </p>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-white/10 p-6 rounded-full text-center aspect-square flex flex-col items-center justify-center">
-              <div className="font-bold text-3xl mb-2">150</div>
-              <div>Connection Limit</div>
-            </div>
-            <div className="bg-white/10 p-6 rounded-full text-center aspect-square flex flex-col items-center justify-center">
-              <div className="font-bold text-3xl mb-2">0</div>
-              <div>Bots & Ads</div>
-            </div>
           </div>
         </div>
 
