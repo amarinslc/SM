@@ -27,6 +27,8 @@ export interface IStorage {
   getPendingFollowRequests(userId: number): Promise<any[]>;
   acceptFollowRequest(followerId: number, followingId: number): Promise<void>;
   rejectFollowRequest(followerId: number, followingId: number): Promise<void>;
+  getPost(id: number): Promise<Post | undefined>;
+  deletePost(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -430,6 +432,20 @@ export class DatabaseStorage implements IStorage {
           eq(follows.isPending, true)
         )
       );
+  }
+
+  async getPost(id: number): Promise<Post | undefined> {
+    const [post] = await db
+      .select()
+      .from(posts)
+      .where(eq(posts.id, id));
+    return post;
+  }
+
+  async deletePost(id: number): Promise<void> {
+    await db
+      .delete(posts)
+      .where(eq(posts.id, id));
   }
 }
 

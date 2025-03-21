@@ -267,30 +267,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add new route for deleting posts
-  app.delete("/api/posts/:id", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
-    try {
-      const postId = parseInt(req.params.id);
-      const post = await storage.getPost(postId);
-
-      if (!post) {
-        return res.status(404).json({ error: "Post not found" });
-      }
-
-      if (post.userId !== req.user!.id) {
-        return res.status(403).json({ error: "Not authorized to delete this post" });
-      }
-
-      await storage.deletePost(postId);
-      res.sendStatus(200);
-    } catch (error) {
-      console.error("Error deleting post:", error);
-      res.status(500).json({ error: "Failed to delete post" });
-    }
-  });
-
   // Update post creation to handle video files
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -330,6 +306,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating post:', error);
       res.status(400).send((error as Error).message);
+    }
+  });
+
+  // Add new route for deleting posts
+  app.delete("/api/posts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.id);
+      const post = await storage.getPost(postId);
+
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      if (post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Not authorized to delete this post" });
+      }
+
+      await storage.deletePost(postId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      res.status(500).json({ error: "Failed to delete post" });
     }
   });
 
