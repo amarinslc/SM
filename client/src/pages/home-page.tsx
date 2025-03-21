@@ -30,130 +30,82 @@ export default function HomePage() {
     enabled: !!user?.id,
   });
 
-  const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
-    queryKey: ["/api/users/search", debouncedSearch],
-    queryFn: async () => {
-      if (!debouncedSearch.trim()) return [];
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(debouncedSearch)}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Search failed');
-      return await res.json();
-    },
-    enabled: debouncedSearch.trim().length > 0,
-  });
-
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container flex justify-between items-center h-16">
-          <h1 className="text-2xl font-bold">Dunbar</h1>
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="search"
-                placeholder="Search users..."
-                className="w-64 pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Link href="/profile">
-              <Button variant="ghost" size="icon">
-                <UserIcon className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => logoutMutation.mutate()}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
+    <div className="min-h-screen bg-background px-4 py-6">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-primary mb-2 rounded-full bg-card p-8 inline-block">Dunbar</h1>
+          <p className="text-lg text-muted-foreground italic rounded-full bg-card p-4">
+            no more than 150 connections at once...because real relationships matter.
+          </p>
         </div>
-      </header>
 
-      <main className="container py-6">
-        {searchQuery && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-4">Search Results</h2>
-            {isSearching ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="grid gap-6 md:grid-cols-[1fr_2fr_1fr]">
+          <div className="space-y-4">
+            <div className="rounded-full overflow-hidden bg-card p-4">
+              <UserCard user={user} />
+              <Button
+                variant="ghost"
+                className="w-full mt-2 rounded-full"
+                onClick={() => logoutMutation.mutate()}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </div>
+            {requests && requests.length > 0 && (
+              <div className="rounded-full overflow-hidden bg-card p-4">
+                <PendingRequests requests={requests} />
               </div>
-            ) : searchResults?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((searchedUser) => (
-                  <UserCard
-                    key={searchedUser.id}
-                    user={searchedUser}
-                    isFollowing={following?.some((f) => f.id === searchedUser.id) ?? false}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No users found</p>
             )}
           </div>
-        )}
 
-        <div className="grid md:grid-cols-[1fr_300px] gap-6">
-          <div className="space-y-6">
+          <div className="space-y-4">
             <PostForm />
             {isFeedLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : feed?.length ? (
+            ) : (
               <div className="space-y-4">
-                {feed.map((post) => (
+                {feed?.map((post) => (
                   <PostCard key={post.id} post={post} />
                 ))}
               </div>
-            ) : (
-              <p className="text-center text-muted-foreground">No posts in your feed. Follow some users to see their posts!</p>
             )}
           </div>
 
-          <div className="space-y-6">
-            <div className="rounded-lg bg-card p-4">
-              <h2 className="font-semibold mb-2">Your Network</h2>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <div>Following: {user.followingCount}/150</div>
-                <div className="w-px h-4 bg-border" />
-                <div>Followers: {user.followerCount}</div>
+          <div>
+            <div className="rounded-full overflow-hidden bg-card p-4 sticky top-4">
+              <div className="space-y-4">
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="rounded-full"
+                />
+                {isFollowingLoading ? (
+                  <div className="flex justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Following ({following?.length || 0}/150)</h3>
+                    {following?.map((followedUser) => (
+                      <Link key={followedUser.id} href={`/profile/${followedUser.id}`}>
+                        <a className="flex items-center space-x-2 p-2 rounded-full hover:bg-muted">
+                          <UserIcon className="h-4 w-4" />
+                          <span>{followedUser.username}</span>
+                        </a>
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-
-            {!isRequestsLoading && requests && requests.length > 0 && (
-              <PendingRequests requests={requests} />
-            )}
-
-            <div className="space-y-4">
-              <h2 className="font-semibold">People You Follow</h2>
-              {isFollowingLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : following?.length ? (
-                following.map((followedUser) => (
-                  <UserCard
-                    key={followedUser.id}
-                    user={followedUser}
-                    isFollowing={true}
-                  />
-                ))
-              ) : (
-                <p className="text-muted-foreground">You're not following anyone yet</p>
-              )}
             </div>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
