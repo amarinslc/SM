@@ -60,35 +60,38 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-[#FFF1E0] flex items-center justify-center p-4">
-      <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden">
-        <div className="p-6 bg-[#87BA8E] text-white flex flex-col justify-center">
-          <h1 className="text-3xl font-bold mb-2">Because real relationships matter.</h1>
-          <p className="text-lg opacity-90 mb-6">
-            Connect to no more than 150 people. No AI. No Ads. No influencers.
-          </p>
+      <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden rounded-[2rem] shadow-xl">
+        <div className="p-8 bg-[#87BA8E] text-white flex flex-col justify-center">
+          <div className="text-center mb-8">
+            <h1 className="text-5xl font-bold mb-4">Dunbar</h1>
+            <p className="text-lg opacity-90">
+              No more than 150 connections at once...
+              <br />because real relationships matter.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="bg-white/10 p-4 rounded-lg text-center">
-              <div className="font-bold text-2xl">150</div>
+            <div className="bg-white/10 p-6 rounded-full text-center aspect-square flex flex-col items-center justify-center">
+              <div className="font-bold text-3xl mb-2">150</div>
               <div>Connection Limit</div>
             </div>
-            <div className="bg-white/10 p-4 rounded-lg text-center">
-              <div className="font-bold text-2xl">0</div>
+            <div className="bg-white/10 p-6 rounded-full text-center aspect-square flex flex-col items-center justify-center">
+              <div className="font-bold text-3xl mb-2">0</div>
               <div>Bots & Ads</div>
             </div>
           </div>
         </div>
 
-        <div>
+        <div className="p-6">
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 rounded-full mb-4">
+              <TabsTrigger value="login" className="rounded-full">Login</TabsTrigger>
+              <TabsTrigger value="register" className="rounded-full">Register</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
               <CardHeader>
-                <CardTitle>Login to your account</CardTitle>
+                <CardTitle>Welcome back</CardTitle>
                 <CardDescription>
-                  Enter your username and password to continue
+                  Enter your credentials to continue
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -106,7 +109,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Username</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -119,7 +122,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" {...field} />
+                            <Input type="password" {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -127,7 +130,7 @@ export default function AuthPage() {
                     />
                     <Button
                       type="submit"
-                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90"
+                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90 rounded-full"
                       disabled={loginMutation.isPending}
                     >
                       {loginMutation.isPending ? (
@@ -142,9 +145,9 @@ export default function AuthPage() {
             </TabsContent>
             <TabsContent value="register">
               <CardHeader>
-                <CardTitle>Create an account</CardTitle>
+                <CardTitle>Join Dunbar</CardTitle>
                 <CardDescription>
-                  Join Dunbar to connect with people who matter
+                  Connect authentically with people who matter
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -172,7 +175,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Username</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -185,7 +188,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Email</FormLabel>
                           <FormControl>
-                            <Input type="email" {...field} />
+                            <Input type="email" {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -198,7 +201,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Full Name</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -211,7 +214,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Password</FormLabel>
                           <FormControl>
-                            <Input type="password" {...field} />
+                            <Input type="password" {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -224,7 +227,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Confirm Password</FormLabel>
                           <FormControl>
-                            <Input type="password" {...field} />
+                            <Input type="password" {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -237,7 +240,7 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Bio</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input {...field} className="rounded-full" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -257,7 +260,7 @@ export default function AuthPage() {
                                 const file = e.target.files?.[0];
                                 if (file) field.onChange(file);
                               }}
-                              className="cursor-pointer"
+                              className="cursor-pointer rounded-full"
                             />
                           </FormControl>
                           <FormMessage />
@@ -266,7 +269,7 @@ export default function AuthPage() {
                     />
                     <Button
                       type="submit"
-                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90"
+                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90 rounded-full"
                       disabled={registerMutation.isPending}
                     >
                       {registerMutation.isPending ? (
