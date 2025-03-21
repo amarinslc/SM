@@ -61,17 +61,17 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen bg-[#FFF1E0] flex items-center justify-center p-4">
       <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden rounded-[2rem] shadow-xl">
-        <div className="p-8 bg-[#87BA8E] text-white flex flex-col justify-center">
-          <div className="text-center mb-12">
+        <div className="p-12 bg-[#87BA8E] text-white flex flex-col justify-center">
+          <div className="text-center mb-16">
             <img 
               src="/assets/Vector.png" 
               alt="Dunbar Logo" 
-              className="w-32 h-32 mx-auto mb-8"
+              className="w-40 h-40 mx-auto mb-10"
             />
-            <div className="text-2xl mb-2">
+            <div className="text-3xl mb-3">
               only <span className="font-bold">150</span> connections
             </div>
-            <p className="text-lg opacity-90">
+            <p className="text-xl opacity-90">
               because real relationships matter
             </p>
           </div>
