@@ -66,7 +66,7 @@ export default function AuthPage() {
             <img 
               src="/assets/Vector.png" 
               alt="Dunbar Logo" 
-              className="w-[90px] h-[90px] mx-auto mb-10"
+              className="w-[180px] h-[180px] mx-auto mb-10"
             />
             <div className="text-xl mb-3">
               only <span className="font-bold">150</span> connections
