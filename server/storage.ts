@@ -18,7 +18,7 @@ export interface IStorage {
   getFollowers(userId: number): Promise<User[]>;
   getFollowing(userId: number): Promise<User[]>;
   createPost(userId: number, content: string, media: any[]): Promise<Post>;
-  getPosts(userId: number): Promise<Post[]>;
+  getPosts(userId: number, viewerId?: number): Promise<Post[]>;
   getFeed(userId: number): Promise<Post[]>;
   sessionStore: session.Store;
   searchUsers(query: string): Promise<User[]>;
@@ -104,7 +104,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Target user not found");
     }
 
-    // Check if already following
+    // Check if already following or has pending request
     const [existing] = await db
       .select()
       .from(follows)
@@ -250,19 +250,58 @@ export class DatabaseStorage implements IStorage {
     return post;
   }
 
-  async getPosts(userId: number): Promise<Post[]> {
+  async getPosts(userId: number, viewerId?: number): Promise<Post[]> {
+    // Get the user's profile
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return [];
+    }
+
+    // If viewing own posts
+    if (viewerId === userId) {
+      return db
+        .select()
+        .from(posts)
+        .where(eq(posts.userId, userId))
+        .orderBy(sql`${posts.createdAt} DESC`);
+    }
+
+    // If account is private, check if viewer is an approved follower
+    if (user.isPrivate) {
+      if (!viewerId) return []; // Not authenticated
+
+      const [isFollower] = await db
+        .select()
+        .from(follows)
+        .where(
+          and(
+            eq(follows.followerId, viewerId),
+            eq(follows.followingId, userId),
+            eq(follows.isPending, false)
+          )
+        );
+
+      if (!isFollower) {
+        return [];
+      }
+    }
+
     return db
       .select()
       .from(posts)
       .where(eq(posts.userId, userId))
-      .orderBy(posts.createdAt);
+      .orderBy(sql`${posts.createdAt} DESC`);
   }
 
   async getFeed(userId: number): Promise<Post[]> {
-    // Get users that the current user follows and are not pending
+    // Get users that the current user actively follows (not pending)
     const following = await db
       .select({
-        following: users,
+        followingId: follows.followingId,
       })
       .from(follows)
       .where(
@@ -270,24 +309,21 @@ export class DatabaseStorage implements IStorage {
           eq(follows.followerId, userId),
           eq(follows.isPending, false)
         )
-      )
-      .innerJoin(users, eq(users.id, follows.followingId));
+      );
 
-    const followingIds = following.map((f) => f.following.id);
+    const followingIds = following.map((f) => f.followingId);
 
     // If not following anyone, return empty feed
     if (followingIds.length === 0) {
       return [];
     }
 
-    // Only get posts from accepted follows
-    const feed = await db
+    // Get posts only from users being followed
+    return db
       .select()
       .from(posts)
       .where(inArray(posts.userId, followingIds))
       .orderBy(sql`${posts.createdAt} DESC`);
-
-    return feed;
   }
 
   async createComment(postId: number, userId: number, content: string): Promise<Comment> {

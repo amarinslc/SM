@@ -2,12 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { insertPostSchema } from "@shared/schema";
+import { users, follows } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import express from 'express';
-import {hashPassword} from './auth';
+import { hashPassword } from './auth';
+import { db } from './db';
+import { and, eq } from 'drizzle-orm';
 
 // Ensure uploads directory exists with proper permissions
 const uploadsDir = path.join(process.cwd(), 'uploads');
@@ -63,6 +65,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.photo = `/uploads/${req.file.filename}`;
       }
 
+      // Convert isPrivate to boolean if present
+      if ('isPrivate' in updateData) {
+        updateData.isPrivate = updateData.isPrivate === 'true';
+      }
+
       console.log('Filtered update data:', updateData);
 
       if (Object.keys(updateData).length === 0 && !req.file) {
@@ -102,7 +109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users/:id", async (req, res) => {
     const user = await storage.getUser(parseInt(req.params.id));
     if (!user) return res.status(404).send("User not found");
-    res.json(user);
+
+    // If the user is private and the requester is not authenticated,
+    // only return basic public information
+    if (user.isPrivate && !req.isAuthenticated()) {
+      const { password, email, ...publicInfo } = user;
+      return res.json(publicInfo);
+    }
+
+    // If authenticated, check if the requester is an approved follower
+    if (user.isPrivate && req.isAuthenticated() && req.user!.id !== user.id) {
+      const [isFollower] = await db
+        .select()
+        .from(follows)
+        .where(
+          and(
+            eq(follows.followerId, req.user!.id),
+            eq(follows.followingId, user.id),
+            eq(follows.isPending, false)
+          )
+        );
+
+      if (!isFollower) {
+        const { password, email, ...publicInfo } = user;
+        return res.json(publicInfo);
+      }
+    }
+
+    const { password, ...userInfo } = user;
+    res.json(userInfo);
   });
 
   app.post("/api/users/:id/follow", async (req, res) => {
@@ -170,7 +205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.acceptFollowRequest(parseInt(req.params.id), req.user!.id);
       res.sendStatus(200);
     } catch (error) {
-      res.status(400).send((error as Error).message);
+      console.error("Error accepting request:", error);
+      res.status(400).json({ error: (error as Error).message });
     }
   });
 
@@ -180,7 +216,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.rejectFollowRequest(parseInt(req.params.id), req.user!.id);
       res.sendStatus(200);
     } catch (error) {
-      res.status(400).send((error as Error).message);
+      console.error("Error rejecting request:", error);
+      res.status(400).json({ error: (error as Error).message });
     }
   });
 
@@ -271,14 +308,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/posts/:userId", async (req, res) => {
-    const posts = await storage.getPosts(parseInt(req.params.userId));
-    res.json(posts);
+    try {
+      const posts = await storage.getPosts(
+        parseInt(req.params.userId),
+        req.isAuthenticated() ? req.user!.id : undefined
+      );
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      res.status(500).json({ error: "Failed to fetch posts" });
+    }
   });
 
   app.get("/api/feed", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const posts = await storage.getFeed(req.user!.id);
-    res.json(posts);
+    try {
+      const posts = await storage.getFeed(req.user!.id);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching feed:", error);
+      res.status(500).json({ error: "Failed to fetch feed" });
+    }
   });
 
   app.post("/api/posts/:postId/comments", async (req, res) => {
