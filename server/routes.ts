@@ -19,7 +19,7 @@ try {
   await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
 }
 
-// Configure multer with improved error handling
+// Update multer configuration to accept video files
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -31,11 +31,11 @@ const upload = multer({
     },
   }),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB
+    fileSize: 50 * 1024 * 1024, // 50MB limit for video files
   },
   fileFilter: (_req, file, cb) => {
-    if (!file.originalname.match(/\.(jpg|jpeg|png|gif)$/i)) {
-      return cb(new Error('Only image files are allowed!'));
+    if (!file.originalname.match(/\.(jpg|jpeg|png|gif|mp4|webm|mov)$/i)) {
+      return cb(new Error('Only image and video files are allowed!'));
     }
     cb(null, true);
   }
@@ -267,6 +267,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add new route for deleting posts
+  app.delete("/api/posts/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.id);
+      const post = await storage.getPost(postId);
+
+      if (!post) {
+        return res.status(404).json({ error: "Post not found" });
+      }
+
+      if (post.userId !== req.user!.id) {
+        return res.status(403).json({ error: "Not authorized to delete this post" });
+      }
+
+      await storage.deletePost(postId);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error deleting post:", error);
+      res.status(500).json({ error: "Failed to delete post" });
+    }
+  });
+
+  // Update post creation to handle video files
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
@@ -287,7 +312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           await fs.writeFile(path.join(process.cwd(), filePath), file.buffer);
           media.push({
-            type: 'image',
+            type: file.mimetype.startsWith('video/') ? 'video' : 'image',
             url: `/uploads/${filename}`
           });
         }

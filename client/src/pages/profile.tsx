@@ -4,8 +4,8 @@ import { User, Post } from "@shared/schema";
 import { ProfileEditor } from "@/components/profile-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Loader2 } from "lucide-react";
-import { useParams } from "wouter";
+import { Pencil, Home, Loader2 } from "lucide-react";
+import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { PostCard } from "@/components/post-card";
 import { UserListDrawer } from "@/components/user-list-drawer";
@@ -122,26 +122,26 @@ export function ProfilePage() {
 
   return (
     <div className="container mx-auto py-6 px-4">
-      <h1 className="text-2xl font-bold mb-6">Profile</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Profile</h1>
+        <Link href="/">
+          <Button variant="ghost" size="sm">
+            <Home className="h-4 w-4 mr-2" />
+            Back to Feed
+          </Button>
+        </Link>
+      </div>
 
       <div className="max-w-2xl space-y-6">
         {isEditing && isOwnProfile ? (
           <>
             <ProfileEditor user={user} onSuccess={() => setIsEditing(false)} />
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setIsEditing(false)}
-            >
+            <Button variant="outline" className="mt-4" onClick={() => setIsEditing(false)}>
               Cancel
             </Button>
           </>
         ) : (
-          <ProfileView
-            user={user}
-            onEdit={isOwnProfile ? () => setIsEditing(true) : undefined}
-            isOwnProfile={!!isOwnProfile}
-          />
+          <ProfileView user={user} onEdit={isOwnProfile ? () => setIsEditing(true) : undefined} isOwnProfile={!!isOwnProfile} />
         )}
 
         <div className="mt-8">
