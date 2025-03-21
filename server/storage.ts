@@ -274,7 +274,7 @@ export class DatabaseStorage implements IStorage {
     if (user.isPrivate) {
       if (!viewerId) return []; // Not authenticated
 
-      const [isFollower] = await db
+      const [isApprovedFollower] = await db
         .select()
         .from(follows)
         .where(
@@ -285,7 +285,7 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      if (!isFollower) {
+      if (!isApprovedFollower) {
         return [];
       }
     }
@@ -298,7 +298,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeed(userId: number): Promise<Post[]> {
-    // Get users that the current user actively follows (not pending)
+    // Get users that the current user actively follows and is approved by
     const following = await db
       .select({
         followingId: follows.followingId,
@@ -318,7 +318,7 @@ export class DatabaseStorage implements IStorage {
       return [];
     }
 
-    // Get posts only from users being followed
+    // Get posts only from users being actively followed
     return db
       .select()
       .from(posts)
@@ -416,7 +416,23 @@ export class DatabaseStorage implements IStorage {
 
   async acceptFollowRequest(followerId: number, followingId: number): Promise<void> {
     await db.transaction(async (tx) => {
-      // Update follow status
+      // Get the follow request
+      const [followRequest] = await tx
+        .select()
+        .from(follows)
+        .where(
+          and(
+            eq(follows.followerId, followerId),
+            eq(follows.followingId, followingId),
+            eq(follows.isPending, true)
+          )
+        );
+
+      if (!followRequest) {
+        throw new Error("Follow request not found");
+      }
+
+      // Update follow status to approved
       await tx
         .update(follows)
         .set({ isPending: false })
@@ -427,13 +443,12 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      // Update follower count
+      // Update follower counts for both users
       await tx
         .update(users)
         .set({ followingCount: sql`${users.followingCount} + 1` })
         .where(eq(users.id, followerId));
 
-      // Update following count
       await tx
         .update(users)
         .set({ followerCount: sql`${users.followerCount} + 1` })
