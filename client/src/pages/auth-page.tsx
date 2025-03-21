@@ -66,12 +66,12 @@ export default function AuthPage() {
             <img 
               src="/assets/Vector.png" 
               alt="Dunbar Logo" 
-              className="w-40 h-40 mx-auto mb-10"
+              className="w-60 h-60 mx-auto mb-10"
             />
-            <div className="text-3xl mb-3">
+            <div className="text-2xl mb-3">
               only <span className="font-bold">150</span> connections
             </div>
-            <p className="text-xl opacity-90">
+            <p className="text-lg opacity-90">
               because real relationships matter
             </p>
           </div>
