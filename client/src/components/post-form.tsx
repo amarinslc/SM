@@ -6,7 +6,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ImagePlus, Loader2, Video, X } from "lucide-react";
 import { useState, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { insertPostSchema } from "@shared/schema";
 
 interface MediaItem {
   type: "image" | "video";
@@ -18,14 +17,15 @@ export function PostForm() {
   const [content, setContent] = useState("");
   const [media, setMedia] = useState<MediaItem[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const createPostMutation = useMutation({
     mutationFn: async () => {
       const formData = new FormData();
       formData.append("content", content);
-      media.forEach((item, index) => {
-        formData.append("media", item.file); // Changed to just "media" to match multer config
+      media.forEach((item) => {
+        formData.append("media", item.file);
       });
 
       const res = await fetch("/api/posts", {
@@ -59,14 +59,14 @@ export function PostForm() {
     },
   });
 
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: "image" | "video") => {
     const files = e.target.files;
     if (!files?.length) return;
 
     const newMedia: MediaItem[] = [];
     for (const file of Array.from(files)) {
       // Check file type
-      if (!file.type.startsWith("image/")) {
+      if (type === "image" && !file.type.startsWith("image/")) {
         toast({
           title: "Invalid file type",
           description: "Please upload only image files",
@@ -75,11 +75,21 @@ export function PostForm() {
         continue;
       }
 
-      // Check file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
+      if (type === "video" && !file.type.startsWith("video/")) {
+        toast({
+          title: "Invalid file type",
+          description: "Please upload only video files",
+          variant: "destructive",
+        });
+        continue;
+      }
+
+      // Check file size (50MB limit for videos, 5MB for images)
+      const maxSize = type === "video" ? 50 * 1024 * 1024 : 5 * 1024 * 1024;
+      if (file.size > maxSize) {
         toast({
           title: "File too large",
-          description: "Image size should be less than 5MB",
+          description: `${type === "video" ? "Video" : "Image"} size should be less than ${maxSize / (1024 * 1024)}MB`,
           variant: "destructive",
         });
         continue;
@@ -87,7 +97,7 @@ export function PostForm() {
 
       const previewUrl = URL.createObjectURL(file);
       newMedia.push({
-        type: "image",
+        type,
         file,
         previewUrl,
       });
@@ -126,11 +136,19 @@ export function PostForm() {
             <div className="grid grid-cols-2 gap-2 mt-4">
               {media.map((item, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={item.previewUrl}
-                    alt=""
-                    className="w-full aspect-square object-cover rounded-md"
-                  />
+                  {item.type === "video" ? (
+                    <video
+                      src={item.previewUrl}
+                      controls
+                      className="w-full aspect-square object-cover rounded-md"
+                    />
+                  ) : (
+                    <img
+                      src={item.previewUrl}
+                      alt=""
+                      className="w-full aspect-square object-cover rounded-md"
+                    />
+                  )}
                   <Button
                     variant="destructive"
                     size="icon"
@@ -153,7 +171,14 @@ export function PostForm() {
               multiple
               className="hidden"
               ref={fileInputRef}
-              onChange={handleImageSelect}
+              onChange={(e) => handleFileSelect(e, "image")}
+            />
+            <input
+              type="file"
+              accept="video/*"
+              className="hidden"
+              ref={videoInputRef}
+              onChange={(e) => handleFileSelect(e, "video")}
             />
             <Button
               type="button"
@@ -167,11 +192,7 @@ export function PostForm() {
               type="button"
               variant="outline"
               size="icon"
-              onClick={() => {
-                toast({
-                  description: "Video upload will be implemented soon",
-                });
-              }}
+              onClick={() => videoInputRef.current?.click()}
             >
               <Video className="h-4 w-4" />
             </Button>
