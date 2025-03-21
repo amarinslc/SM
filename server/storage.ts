@@ -86,19 +86,11 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Cannot follow yourself");
     }
 
-    // Ensure both IDs are valid integers
-    const followerIdInt = typeof followerId === 'number' ? followerId : parseInt(followerId as any);
-    const followingIdInt = typeof followingId === 'number' ? followingId : parseInt(followingId as any);
-
-    if (isNaN(followerIdInt) || isNaN(followingIdInt)) {
-      throw new Error("Invalid user IDs");
-    }
-
     // Check if the target user exists
     const [targetUser] = await db
       .select()
       .from(users)
-      .where(eq(users.id, followingIdInt));
+      .where(eq(users.id, followingId));
 
     if (!targetUser) {
       throw new Error("Target user not found");
@@ -110,8 +102,8 @@ export class DatabaseStorage implements IStorage {
       .from(follows)
       .where(
         and(
-          eq(follows.followerId, followerIdInt),
-          eq(follows.followingId, followingIdInt)
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId)
         )
       );
 
@@ -123,7 +115,7 @@ export class DatabaseStorage implements IStorage {
     const [follower] = await db
       .select()
       .from(users)
-      .where(eq(users.id, followerIdInt));
+      .where(eq(users.id, followerId));
 
     if (!follower) {
       throw new Error("Follower user not found");
@@ -133,29 +125,11 @@ export class DatabaseStorage implements IStorage {
       throw new Error("You have reached the maximum number of follows (150)");
     }
 
-    // Start a transaction to ensure consistency
-    await db.transaction(async (tx) => {
-      // Create follow relationship
-      await tx.insert(follows).values({
-        followerId: followerIdInt,
-        followingId: followingIdInt,
-        isPending: targetUser.isPrivate, // Set pending if account is private
-      });
-
-      // Only update counts if the account is not private
-      if (!targetUser.isPrivate) {
-        // Update follower count
-        await tx
-          .update(users)
-          .set({ followingCount: sql`${users.followingCount} + 1` })
-          .where(eq(users.id, followerIdInt));
-
-        // Update following count
-        await tx
-          .update(users)
-          .set({ followerCount: sql`${users.followerCount} + 1` })
-          .where(eq(users.id, followingIdInt));
-      }
+    // Create follow relationship with pending status if account is private
+    await db.insert(follows).values({
+      followerId,
+      followingId,
+      isPending: targetUser.isPrivate,
     });
   }
 
@@ -251,17 +225,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPosts(userId: number, viewerId?: number): Promise<Post[]> {
-    // Get the user's profile
-    const [user] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId));
-
-    if (!user) {
+    // If no viewer ID is provided, return no posts (must be authenticated)
+    if (!viewerId) {
       return [];
     }
 
-    // If viewing own posts
+    // If viewing own posts, return all posts
     if (viewerId === userId) {
       return db
         .select()
@@ -270,26 +239,24 @@ export class DatabaseStorage implements IStorage {
         .orderBy(sql`${posts.createdAt} DESC`);
     }
 
-    // If account is private, check if viewer is an approved follower
-    if (user.isPrivate) {
-      if (!viewerId) return []; // Not authenticated
+    // Check if viewer is an approved follower
+    const [isApprovedFollower] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, viewerId),
+          eq(follows.followingId, userId),
+          eq(follows.isPending, false)
+        )
+      );
 
-      const [isApprovedFollower] = await db
-        .select()
-        .from(follows)
-        .where(
-          and(
-            eq(follows.followerId, viewerId),
-            eq(follows.followingId, userId),
-            eq(follows.isPending, false)
-          )
-        );
-
-      if (!isApprovedFollower) {
-        return [];
-      }
+    // If not an approved follower, return no posts
+    if (!isApprovedFollower) {
+      return [];
     }
 
+    // Return posts if viewer is an approved follower
     return db
       .select()
       .from(posts)
@@ -298,7 +265,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getFeed(userId: number): Promise<Post[]> {
-    // Get users that the current user actively follows and is approved by
+    // Get list of users that the current user is actively following (not pending)
     const following = await db
       .select({
         followingId: follows.followingId,
@@ -432,7 +399,7 @@ export class DatabaseStorage implements IStorage {
         throw new Error("Follow request not found");
       }
 
-      // Update follow status to approved
+      // Update the follow status to approved
       await tx
         .update(follows)
         .set({ isPending: false })
@@ -443,7 +410,7 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
-      // Update follower counts for both users
+      // Update follower counts
       await tx
         .update(users)
         .set({ followingCount: sql`${users.followingCount} + 1` })
@@ -457,12 +424,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async rejectFollowRequest(followerId: number, followingId: number): Promise<void> {
+    // Simply delete the follow request
     await db
       .delete(follows)
       .where(
         and(
           eq(follows.followerId, followerId),
-          eq(follows.followingId, followingId)
+          eq(follows.followingId, followingId),
+          eq(follows.isPending, true)
         )
       );
   }
