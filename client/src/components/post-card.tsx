@@ -37,7 +37,10 @@ export function PostCard({ post }: PostCardProps) {
     },
     onSuccess: () => {
       setNewComment("");
+      // Invalidate both the comments and the feed queries
       queryClient.invalidateQueries({ queryKey: [`/api/posts/${post.id}/comments`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/posts`] });
     },
     onError: (error: Error) => {
       toast({
@@ -70,7 +73,7 @@ export function PostCard({ post }: PostCardProps) {
             <a className="font-semibold hover:underline">{author.name}</a>
           </Link>
           <span className="text-sm text-muted-foreground">
-            {formatDistanceToNow(new Date(post.createdAt || new Date()), { addSuffix: true })}
+            {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
           </span>
         </div>
       </CardHeader>

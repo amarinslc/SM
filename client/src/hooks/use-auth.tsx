@@ -39,6 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Clear all existing queries and refetch feed data
+      queryClient.removeQueries({ queryKey: ["/api/feed"] });
+      queryClient.removeQueries({ queryKey: ["/api/users"] });
+      queryClient.refetchQueries({ queryKey: ["/api/feed"] });
     },
     onError: (error: Error) => {
       toast({
@@ -72,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Clear cached data and refetch feed
+      queryClient.removeQueries({ queryKey: ["/api/feed"] });
+      queryClient.removeQueries({ queryKey: ["/api/users"] });
+      queryClient.refetchQueries({ queryKey: ["/api/feed"] });
     },
     onError: (error: Error) => {
       toast({
@@ -87,6 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
+      // Clear all cached data on logout
+      queryClient.clear();
       queryClient.setQueryData(["/api/user"], null);
     },
     onError: (error: Error) => {
