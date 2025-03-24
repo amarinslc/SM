@@ -83,8 +83,61 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/user", (req, res) => {
+  app.post("/api/register", async (req, res, next) => {
+    try {
+      // Check for existing username
+      const existingUsername = await storage.getUserByUsername(req.body.username);
+      if (existingUsername) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check for existing email
+      const existingEmail = await storage.getUserByEmail(req.body.email);
+      if (existingEmail) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      const user = await storage.createUser({
+        ...req.body,
+        password: await hashPassword(req.body.password),
+      });
+
+      // Send verification email
+      await storage.sendVerificationEmail(user.id, user.email);
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        res.status(201).json({ 
+          ...user,
+          message: "Please check your email to verify your account" 
+        });
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/verify-email/:token", async (req, res) => {
+    try {
+      const verified = await storage.verifyEmail(req.params.token);
+      if (verified) {
+        res.json({ message: "Email verified successfully" });
+      } else {
+        res.status(400).json({ message: "Invalid or expired verification token" });
+      }
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify email" });
+    }
+  });
+
+
+  app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+
+    const isVerified = await storage.isEmailVerified(req.user!.id);
+    res.json({
+      ...req.user,
+      emailVerified: isVerified
+    });
   });
 }

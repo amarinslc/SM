@@ -4,6 +4,12 @@ import { InsertUser, User, Post, Comment, users, follows, posts, comments } from
 import { eq, and, inArray, or, sql } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
+import { Resend } from 'resend';
+import { randomBytes } from 'crypto';
+import { promisify } from 'util';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const randomBytesAsync = promisify(randomBytes);
 
 const PostgresSessionStore = connectPg(session);
 
@@ -29,6 +35,9 @@ export interface IStorage {
   rejectFollowRequest(followerId: number, followingId: number): Promise<void>;
   getPost(id: number): Promise<Post | undefined>;
   deletePost(id: number): Promise<void>;
+  verifyEmail(token: string): Promise<boolean>;
+  sendVerificationEmail(userId: number, email: string): Promise<void>;
+  isEmailVerified(userId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -52,7 +61,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email));
     return user;
   }
 
@@ -446,6 +458,59 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(posts)
       .where(eq(posts.id, id));
+  }
+
+  async verifyEmail(token: string): Promise<boolean> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.verificationToken, token));
+
+    if (!user) {
+      return false;
+    }
+
+    await db
+      .update(users)
+      .set({
+        emailVerified: true,
+        verificationToken: null,
+      })
+      .where(eq(users.id, user.id));
+
+    return true;
+  }
+
+  async sendVerificationEmail(userId: number, email: string): Promise<void> {
+    const token = (await randomBytesAsync(32)).toString('hex');
+
+    await db
+      .update(users)
+      .set({ verificationToken: token })
+      .where(eq(users.id, userId));
+
+    const verificationLink = `${process.env.APP_URL}/verify-email?token=${token}`;
+
+    await resend.emails.send({
+      from: 'Dunbar <verification@dunbar.social>',
+      to: email,
+      subject: 'Verify your email address',
+      html: `
+        <h1>Welcome to Dunbar!</h1>
+        <p>Please verify your email address by clicking the link below:</p>
+        <a href="${verificationLink}">Verify Email</a>
+        <p>This link will expire in 24 hours.</p>
+      `
+    });
+  }
+
+  async isEmailVerified(userId: number): Promise<boolean> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+
+    return user?.emailVerified ?? false;
   }
 }
 
