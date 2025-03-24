@@ -1,6 +1,6 @@
 import session from "express-session";
+import { users, type User, type InsertUser, Post, Comment, comments, follows, posts } from "@shared/schema";
 import { db } from "./db";
-import { InsertUser, User, Post, Comment, users, follows, posts, comments } from "@shared/schema";
 import { eq, and, inArray, or, sql } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -38,6 +38,8 @@ export interface IStorage {
   verifyEmail(token: string): Promise<boolean>;
   sendVerificationEmail(userId: number, email: string): Promise<void>;
   isEmailVerified(userId: number): Promise<boolean>;
+  sendPasswordResetEmail(email: string): Promise<void>;
+  resetPassword(token: string, newPassword: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -482,26 +484,102 @@ export class DatabaseStorage implements IStorage {
   }
 
   async sendVerificationEmail(userId: number, email: string): Promise<void> {
-    const token = (await randomBytesAsync(32)).toString('hex');
+    try {
+      const token = (await randomBytesAsync(32)).toString('hex');
+
+      await db
+        .update(users)
+        .set({ verificationToken: token })
+        .where(eq(users.id, userId));
+
+      const verificationLink = `${process.env.APP_URL || 'http://localhost:5000'}/verify-email?token=${token}`;
+
+      await resend.emails.send({
+        from: 'Dunbar <verification@dunbar.social>',
+        to: email,
+        subject: 'Verify your email address',
+        html: `
+          <h1>Welcome to Dunbar!</h1>
+          <p>Please verify your email address by clicking the link below:</p>
+          <a href="${verificationLink}">Verify Email</a>
+          <p>This link will expire in 24 hours.</p>
+        `
+      });
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new Error('Failed to send verification email. Please try again later.');
+    }
+  }
+
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, email));
+
+      if (!user) {
+        // Don't reveal if the email exists
+        return;
+      }
+
+      const token = (await randomBytesAsync(32)).toString('hex');
+      const expires = new Date();
+      expires.setHours(expires.getHours() + 1); // Token expires in 1 hour
+
+      await db
+        .update(users)
+        .set({
+          resetPasswordToken: token,
+          resetPasswordExpires: expires,
+        })
+        .where(eq(users.id, user.id));
+
+      const resetLink = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+
+      await resend.emails.send({
+        from: 'Dunbar <noreply@dunbar.social>',
+        to: email,
+        subject: 'Reset your password',
+        html: `
+          <h1>Password Reset Request</h1>
+          <p>You requested to reset your password. Click the link below to proceed:</p>
+          <a href="${resetLink}">Reset Password</a>
+          <p>This link will expire in 1 hour.</p>
+          <p>If you didn't request this, please ignore this email.</p>
+        `
+      });
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      throw new Error('Failed to send password reset email. Please try again later.');
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<boolean> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.resetPasswordToken, token),
+          sql`${users.resetPasswordExpires} > NOW()`
+        )
+      );
+
+    if (!user) {
+      return false;
+    }
 
     await db
       .update(users)
-      .set({ verificationToken: token })
-      .where(eq(users.id, userId));
+      .set({
+        password: newPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      })
+      .where(eq(users.id, user.id));
 
-    const verificationLink = `${process.env.APP_URL}/verify-email?token=${token}`;
-
-    await resend.emails.send({
-      from: 'Dunbar <verification@dunbar.social>',
-      to: email,
-      subject: 'Verify your email address',
-      html: `
-        <h1>Welcome to Dunbar!</h1>
-        <p>Please verify your email address by clicking the link below:</p>
-        <a href="${verificationLink}">Verify Email</a>
-        <p>This link will expire in 24 hours.</p>
-      `
-    });
+    return true;
   }
 
   async isEmailVerified(userId: number): Promise<boolean> {

@@ -102,8 +102,13 @@ export function setupAuth(app: Express) {
         password: await hashPassword(req.body.password),
       });
 
-      // Send verification email
-      await storage.sendVerificationEmail(user.id, user.email);
+      try {
+        // Send verification email
+        await storage.sendVerificationEmail(user.id, user.email);
+      } catch (error) {
+        console.error('Failed to send verification email:', error);
+        // Continue with login even if email fails
+      }
 
       req.login(user, (err) => {
         if (err) return next(err);
@@ -114,6 +119,33 @@ export function setupAuth(app: Express) {
       });
     } catch (error) {
       next(error);
+    }
+  });
+
+  app.post("/api/forgot-password", async (req, res) => {
+    try {
+      const { email } = req.body;
+      await storage.sendPasswordResetEmail(email);
+      res.json({ message: "If an account exists with this email, you will receive password reset instructions." });
+    } catch (error) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  app.post("/api/reset-password", async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      const success = await storage.resetPassword(token, await hashPassword(newPassword));
+
+      if (success) {
+        res.json({ message: "Password has been reset successfully" });
+      } else {
+        res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      res.status(500).json({ message: "Failed to reset password" });
     }
   });
 
@@ -129,7 +161,6 @@ export function setupAuth(app: Express) {
       res.status(500).json({ message: "Failed to verify email" });
     }
   });
-
 
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

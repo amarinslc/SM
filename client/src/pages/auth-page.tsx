@@ -23,6 +23,7 @@ import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { Redirect } from "wouter";
 import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
 
 // Create schemas for login and forgot password
 const loginSchema = z.object({
@@ -36,6 +37,7 @@ const forgotPasswordSchema = z.object({
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
+  const { toast } = useToast();
 
   const loginForm = useForm<z.infer<typeof loginSchema>>({
     resolver: zodResolver(loginSchema),
@@ -292,9 +294,31 @@ export default function AuthPage() {
               <CardContent>
                 <Form {...forgotPasswordForm}>
                   <form
-                    onSubmit={forgotPasswordForm.handleSubmit((data) => {
-                      // We'll implement this mutation next
-                      console.log(data);
+                    onSubmit={forgotPasswordForm.handleSubmit(async (data) => {
+                      try {
+                        const response = await fetch('/api/forgot-password', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                          },
+                          body: JSON.stringify(data),
+                        });
+
+                        if (!response.ok) {
+                          throw new Error('Failed to send reset email');
+                        }
+
+                        toast({
+                          title: "Reset email sent",
+                          description: "If an account exists with this email, you will receive password reset instructions.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Error",
+                          description: error instanceof Error ? error.message : "Failed to send reset email",
+                          variant: "destructive",
+                        });
+                      }
                     })}
                     className="space-y-4"
                   >
