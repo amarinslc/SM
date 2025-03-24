@@ -24,10 +24,14 @@ import { useForm } from "react-hook-form";
 import { Redirect } from "wouter";
 import { z } from "zod";
 
-// Create a separate login schema
+// Create schemas for login and forgot password
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
 });
 
 export default function AuthPage() {
@@ -51,6 +55,13 @@ export default function AuthPage() {
       name: "",
       bio: "",
       photo: undefined,
+    },
+  });
+
+  const forgotPasswordForm = useForm<z.infer<typeof forgotPasswordSchema>>({
+    resolver: zodResolver(forgotPasswordSchema),
+    defaultValues: {
+      email: "",
     },
   });
 
@@ -79,9 +90,10 @@ export default function AuthPage() {
 
         <div className="p-6">
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 rounded-full mb-4">
+            <TabsList className="grid w-full grid-cols-3 rounded-full mb-4">
               <TabsTrigger value="login" className="rounded-full">Login</TabsTrigger>
               <TabsTrigger value="register" className="rounded-full">Register</TabsTrigger>
+              <TabsTrigger value="forgot" className="rounded-full">Reset</TabsTrigger>
             </TabsList>
             <TabsContent value="login">
               <CardHeader>
@@ -273,6 +285,45 @@ export default function AuthPage() {
                       ) : (
                         "Register"
                       )}
+                    </Button>
+                  </form>
+                </Form>
+              </CardContent>
+            </TabsContent>
+            <TabsContent value="forgot">
+              <CardHeader>
+                <CardTitle>Reset Password</CardTitle>
+                <CardDescription>
+                  Enter your email to receive a password reset link
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Form {...forgotPasswordForm}>
+                  <form
+                    onSubmit={forgotPasswordForm.handleSubmit((data) => {
+                      // We'll implement this mutation next
+                      console.log(data);
+                    })}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={forgotPasswordForm.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" {...field} className="rounded-full" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full bg-[#87BA8E] hover:bg-[#87BA8E]/90 rounded-full"
+                    >
+                      Send Reset Link
                     </Button>
                   </form>
                 </Form>
