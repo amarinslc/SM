@@ -74,9 +74,9 @@ export default function AuthPage() {
       <Card className="w-full max-w-4xl grid md:grid-cols-2 overflow-hidden rounded-[2rem] shadow-xl">
         <div className="p-12 bg-[#87BA8E] text-white flex flex-col justify-center">
           <div className="text-center mb-16">
-            <img 
-              src="/assets/Vector.png" 
-              alt="Dunbar Logo" 
+            <img
+              src="/assets/Vector.png"
+              alt="Dunbar Logo"
               className="w-[180px] h-[180px] mx-auto mb-10"
             />
             <div className="text-xl mb-3">
@@ -162,16 +162,8 @@ export default function AuthPage() {
                 <Form {...registerForm}>
                   <form
                     onSubmit={registerForm.handleSubmit((data) => {
-                      const formData = new FormData();
-                      Object.entries(data).forEach(([key, value]) => {
-                        if (key === 'photo' && value instanceof File) {
-                          formData.append('photo', value);
-                        } else if (value !== undefined && value !== null) {
-                          formData.append(key, value.toString());
-                        }
-                      });
-
-                      registerMutation.mutate(formData);
+                      const { confirmPassword, ...registerData } = data;
+                      registerMutation.mutate(registerData);
                     })}
                     className="space-y-4"
                     encType="multipart/form-data"

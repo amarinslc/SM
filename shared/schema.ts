@@ -47,9 +47,12 @@ export const insertUserSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
   name: z.string().min(1, "Name is required"),
-  bio: z.string(),
-  photo: z.any(),
+  bio: z.string().optional(),
+  photo: z.any().optional(),
   isPrivate: z.boolean().default(true),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
