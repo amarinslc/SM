@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -51,7 +51,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
       }
 
       // Handle photo upload
-      const photoInput = form.watch('photo');
+      const photoInput = form.getValues('photo');
       if (photoInput instanceof FileList && photoInput.length > 0) {
         formData.append('photo', photoInput[0]);
       }
@@ -145,9 +145,8 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Name</FormLabel>
                 <FormControl>
-                  <Input {...field} />
+                  <Input {...field} placeholder="Name" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -159,9 +158,12 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
             name="bio"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Bio</FormLabel>
                 <FormControl>
-                  <Textarea {...field} />
+                  <Textarea 
+                    {...field} 
+                    placeholder="Write something about yourself..."
+                    className="min-h-[100px] resize-none"
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

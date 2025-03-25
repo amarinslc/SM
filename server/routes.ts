@@ -44,58 +44,6 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // Replace the profile update endpoint
-  app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
-    try {
-      const updateData: Record<string, any> = {};
-
-      // Handle text fields
-      ['name', 'bio'].forEach(field => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field].trim();
-        }
-      });
-
-      // Handle photo upload
-      if (req.file) {
-        updateData.photo = `/uploads/${req.file.filename}`;
-      }
-
-      // Check if there are any changes to update
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ message: "No changes detected" });
-      }
-
-      const updatedUser = await storage.updateUser(req.user!.id, updateData);
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('Profile update error:', error);
-      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update profile" });
-    }
-  });
-
-  // Search endpoint should be before dynamic routes to avoid conflicts
-  app.get("/api/users/search", async (req, res) => {
-    const query = req.query.q?.toString() || "";
-    console.log(`Search query received: "${query}"`);
-    if (!query) {
-      console.log("Empty query, returning empty results");
-      return res.json([]);
-    }
-
-    try {
-      const users = await storage.searchUsers(query);
-      console.log(`Found ${users.length} users matching query "${query}"`);
-      console.log("Search results:", users.map(u => u.username));
-      res.json(users);
-    } catch (error) {
-      console.error("Search error:", error);
-      res.status(500).json({ error: "Search failed" });
-    }
-  });
-
   app.get("/api/users/:id", async (req, res) => {
     const user = await storage.getUser(parseInt(req.params.id));
     if (!user) return res.status(404).send("User not found");
@@ -126,8 +74,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
 
+    // If it's the user's own profile or they're an approved follower
     const { password, ...userInfo } = user;
     res.json(userInfo);
+  });
+
+  // Search endpoint should be before dynamic routes to avoid conflicts
+  app.get("/api/users/search", async (req, res) => {
+    const query = req.query.q?.toString() || "";
+    console.log(`Search query received: "${query}"`);
+    if (!query) {
+      console.log("Empty query, returning empty results");
+      return res.json([]);
+    }
+
+    try {
+      const users = await storage.searchUsers(query);
+      console.log(`Found ${users.length} users matching query "${query}"`);
+      console.log("Search results:", users.map(u => u.username));
+      res.json(users);
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Search failed" });
+    }
+  });
+
+
+  app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const updateData: Record<string, any> = {};
+
+      // Handle text fields
+      ['name', 'bio'].forEach(field => {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field].trim();
+        }
+      });
+
+      // Handle photo upload
+      if (req.file) {
+        updateData.photo = `/uploads/${req.file.filename}`;
+      }
+
+      // Check if there are any changes to update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No changes detected" });
+      }
+
+      const updatedUser = await storage.updateUser(req.user!.id, updateData);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update profile" });
+    }
   });
 
   app.post("/api/users/:id/follow", async (req, res) => {
