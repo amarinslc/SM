@@ -41,12 +41,12 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
       const formData = new FormData();
 
       // Only include fields that have changed
-      if (data.name !== user.name) {
-        formData.append('name', data.name);
+      if (data.name.trim() !== user.name) {
+        formData.append('name', data.name.trim());
       }
 
-      if (data.bio !== user.bio) {
-        formData.append('bio', data.bio || '');
+      if (data.bio?.trim() !== user.bio) {
+        formData.append('bio', data.bio?.trim() || '');
       }
 
       // Handle photo upload
@@ -60,6 +60,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
           title: "No changes detected",
           description: "Make some changes before saving.",
         });
+        setIsSubmitting(false);
         return;
       }
 
@@ -115,9 +116,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
             <Button
               type="button"
               variant="outline"
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
+              onClick={() => fileInputRef.current?.click()}
             >
               Change Photo
             </Button>
