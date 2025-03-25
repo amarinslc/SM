@@ -350,22 +350,19 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
     console.log('Storage: updateUser called with data:', data);
 
-    // Ensure we have valid data to update
+    // Ensure we have data to update
     if (!data || Object.keys(data).length === 0) {
-      throw new Error('No valid data provided for update');
+      throw new Error('No data provided for update');
     }
 
-    // Ensure all values are defined
+    // Remove any undefined values
     const updateData = Object.fromEntries(
       Object.entries(data).filter(([_, value]) => value !== undefined)
     );
 
-    console.log('Storage: Cleaned update data:', updateData);
+    console.log('Storage: Filtered update data:', updateData);
 
-    if (Object.keys(updateData).length === 0) {
-      throw new Error('No valid data provided for update');
-    }
-
+    // Perform the update
     const [updatedUser] = await db
       .update(users)
       .set(updateData)

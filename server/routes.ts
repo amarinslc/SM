@@ -44,29 +44,17 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // Add profile update endpoint
+  // Replace the profile update endpoint
   app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      console.log('Profile update request body:', req.body);
-      console.log('Profile photo:', req.file);
+      const updateData: Record<string, any> = {};
 
-      // Build update data from allowed fields
-      const allowedFields = ['name', 'bio', 'isPrivate'];
-      const updateData = {};
-
-      // Process each field, ensuring values are properly formatted
-      allowedFields.forEach(field => {
+      // Handle text fields
+      ['name', 'bio'].forEach(field => {
         if (req.body[field] !== undefined) {
-          if (field === 'isPrivate') {
-            updateData[field] = req.body[field] === 'true';
-          } else {
-            const value = req.body[field].trim();
-            if (value !== '') {
-              updateData[field] = value;
-            }
-          }
+          updateData[field] = req.body[field].trim();
         }
       });
 
@@ -75,20 +63,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.photo = `/uploads/${req.file.filename}`;
       }
 
-      console.log('Filtered update data:', updateData);
-
-      // Ensure there's at least one valid update
+      // Check if there are any changes to update
       if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ message: "No valid data provided for update" });
+        return res.status(400).json({ message: "No changes detected" });
       }
 
       const updatedUser = await storage.updateUser(req.user!.id, updateData);
-      console.log('Profile updated successfully:', updatedUser);
-
       res.json(updatedUser);
     } catch (error) {
       console.error('Profile update error:', error);
-      res.status(400).send((error as Error).message);
+      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update profile" });
     }
   });
 
