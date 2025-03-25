@@ -51,16 +51,8 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
           </div>
 
           <div className="space-y-2">
-            <div>
-              <label className="font-medium">Email</label>
-              <p>{user.email}</p>
-            </div>
-
             {user.bio && (
-              <div>
-                <label className="font-medium">Bio</label>
-                <p>{user.bio}</p>
-              </div>
+              <p className="text-muted-foreground">{user.bio}</p>
             )}
 
             <div className="flex gap-4 text-sm">
