@@ -48,34 +48,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = await storage.getUser(parseInt(req.params.id));
     if (!user) return res.status(404).send("User not found");
 
-    // If the user is private and the requester is not authenticated,
-    // only return basic public information
-    if (user.isPrivate && !req.isAuthenticated()) {
-      const { password, email, ...publicInfo } = user;
+    // If viewing someone else's profile, never show email
+    if (!req.isAuthenticated() || req.user!.id !== user.id) {
+      const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...publicInfo } = user;
       return res.json(publicInfo);
     }
 
-    // If authenticated, check if the requester is an approved follower
-    if (user.isPrivate && req.isAuthenticated() && req.user!.id !== user.id) {
-      const [isFollower] = await db
-        .select()
-        .from(follows)
-        .where(
-          and(
-            eq(follows.followerId, req.user!.id),
-            eq(follows.followingId, user.id),
-            eq(follows.isPending, false)
-          )
-        );
-
-      if (!isFollower) {
-        const { password, email, ...publicInfo } = user;
-        return res.json(publicInfo);
-      }
-    }
-
-    // If it's the user's own profile or they're an approved follower
-    const { password, ...userInfo } = user;
+    // If it's the user's own profile, include email but not sensitive data
+    const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...userInfo } = user;
     res.json(userInfo);
   });
 

@@ -119,22 +119,32 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
               name="photo"
               render={({ field: { onChange, value, ...field } }) => (
                 <FormItem>
-                  <FormLabel className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2">
-                    Change Photo
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="relative"
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
                         if (file) {
-                          onChange(e.target.files);
+                          onChange(new FileList([file]));
                           setPhotoPreview(URL.createObjectURL(file));
                         }
-                      }}
-                      {...field}
-                    />
-                  </FormLabel>
+                      };
+                      input.click();
+                    }}
+                  >
+                    Change Photo
+                  </Button>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    {...field}
+                  />
                 </FormItem>
               )}
             />
