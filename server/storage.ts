@@ -355,7 +355,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error('No valid data provided for update');
     }
 
-    // Remove any undefined values and empty strings
+    // Ensure all values are defined
     const updateData = Object.fromEntries(
       Object.entries(data).filter(([_, value]) => value !== undefined)
     );

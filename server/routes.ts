@@ -52,24 +52,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Profile update request body:', req.body);
       console.log('Profile photo:', req.file);
 
-      // Only allow updating specific fields
+      // Build update data from allowed fields
       const allowedFields = ['name', 'bio', 'isPrivate'];
-      const updateData = Object.fromEntries(
-        Object.entries(req.body)
-          .filter(([key]) => allowedFields.includes(key))
-      );
+      const updateData = {};
+
+      // Process each field, ensuring values are properly formatted
+      allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          if (field === 'isPrivate') {
+            updateData[field] = req.body[field] === 'true';
+          } else {
+            const value = req.body[field].trim();
+            if (value !== '') {
+              updateData[field] = value;
+            }
+          }
+        }
+      });
 
       // Handle photo upload
       if (req.file) {
         updateData.photo = `/uploads/${req.file.filename}`;
       }
 
-      // Convert isPrivate to boolean if present
-      if ('isPrivate' in updateData) {
-        updateData.isPrivate = updateData.isPrivate === 'true';
-      }
-
       console.log('Filtered update data:', updateData);
+
+      // Ensure there's at least one valid update
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: "No valid data provided for update" });
+      }
 
       const updatedUser = await storage.updateUser(req.user!.id, updateData);
       console.log('Profile updated successfully:', updatedUser);
