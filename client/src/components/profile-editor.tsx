@@ -56,8 +56,8 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
         formData.append('photo', photoInput[0]);
       }
 
-      // Only proceed if there are actual changes
-      if (formData.entries().next().done) {
+      // Check if there are any changes to submit
+      if ([...formData.entries()].length === 0) {
         toast({
           title: "No changes detected",
           description: "Make some changes before saving.",
@@ -67,7 +67,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
 
       const response = await fetch('/api/user/profile', {
         method: 'PATCH',
-        body: formData, // FormData automatically sets the correct Content-Type
+        body: formData,
       });
 
       if (!response.ok) {
@@ -117,12 +117,11 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
             <FormField
               control={form.control}
               name="photo"
-              render={({ field: { onChange, value, ...field } }) => (
+              render={({ field: { onChange, ...field } }) => (
                 <FormItem>
                   <Button
                     type="button"
                     variant="outline"
-                    className="relative"
                     onClick={() => {
                       const input = document.createElement('input');
                       input.type = 'file';
@@ -130,7 +129,8 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
                       input.onchange = (e) => {
                         const file = (e.target as HTMLInputElement).files?.[0];
                         if (file) {
-                          onChange(new FileList([file]));
+                          // Pass the FileList directly from the input
+                          onChange((e.target as HTMLInputElement).files);
                           setPhotoPreview(URL.createObjectURL(file));
                         }
                       };

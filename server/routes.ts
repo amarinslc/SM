@@ -48,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = await storage.getUser(parseInt(req.params.id));
     if (!user) return res.status(404).send("User not found");
 
-    // If viewing someone else's profile, never show email
+    // If viewing someone else's profile, never show email or sensitive data
     if (!req.isAuthenticated() || req.user!.id !== user.id) {
       const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...publicInfo } = user;
       return res.json(publicInfo);
