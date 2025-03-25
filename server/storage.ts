@@ -355,12 +355,16 @@ export class DatabaseStorage implements IStorage {
       throw new Error('No valid data provided for update');
     }
 
-    // Remove any undefined values
+    // Remove any undefined values and empty strings
     const updateData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined)
+      Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
     );
 
     console.log('Storage: Cleaned update data:', updateData);
+
+    if (Object.keys(updateData).length === 0) {
+      throw new Error('No valid data provided for update');
+    }
 
     const [updatedUser] = await db
       .update(users)
@@ -497,7 +501,7 @@ export class DatabaseStorage implements IStorage {
       console.log(`Generated verification link: ${verificationLink}`);
 
       const emailResponse = await resend.emails.send({
-        from: 'Dunbar <verification@dunbar.social>',
+        from: 'Dunbar <verify@example.com>', // Generic "from" address
         to: email,
         subject: 'Verify your email address',
         html: `
