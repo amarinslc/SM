@@ -57,7 +57,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     if (!user) return undefined;
 
-    // Remove sensitive fields from the response
+    // Always remove sensitive fields for public profile
     const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
     return safeUser as User;
   }
@@ -66,7 +66,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     if (!user) return undefined;
 
-    // Remove sensitive fields from the response
+    // Always remove sensitive fields for public profile
     const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
     return safeUser as User;
   }
@@ -621,7 +621,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     if (!user) return undefined;
 
-    // Only remove the password and tokens
+    // Remove only security-sensitive fields, keep profile data
     const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...fullUser } = user;
     return fullUser as User;
   }
