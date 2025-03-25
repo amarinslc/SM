@@ -44,7 +44,7 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // Add new profile update endpoint
+  // Add profile update endpoint
   app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
@@ -53,11 +53,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('Profile photo:', req.file);
 
       // Only allow updating specific fields
-      const allowedFields = ['email', 'name', 'bio', 'photo', 'isPrivate'];
+      const allowedFields = ['name', 'bio', 'isPrivate'];
       const updateData = Object.fromEntries(
         Object.entries(req.body)
           .filter(([key]) => allowedFields.includes(key))
-          .filter(([_, value]) => value !== undefined)
       );
 
       // Handle photo upload
@@ -71,10 +70,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log('Filtered update data:', updateData);
-
-      if (Object.keys(updateData).length === 0 && !req.file) {
-        return res.status(400).send("No valid data provided for update");
-      }
 
       const updatedUser = await storage.updateUser(req.user!.id, updateData);
       console.log('Profile updated successfully:', updatedUser);
@@ -234,12 +229,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).send("Username already exists");
       }
 
-      // Check for existing email
-      const existingEmail = await storage.getUserByEmail(req.body.email);
-      if (existingEmail) {
-        console.log("Registration failed: Email exists");
-        return res.status(400).send("Email already exists");
-      }
+      // Check for existing email - removed email check as per instruction.
+      //const existingEmail = await storage.getUserByEmail(req.body.email);
+      //if (existingEmail) {
+      //  console.log("Registration failed: Email exists");
+      //  return res.status(400).send("Email already exists");
+      //}
 
       const hashedPassword = await hashPassword(req.body.password);
 

@@ -357,7 +357,7 @@ export class DatabaseStorage implements IStorage {
 
     // Remove any undefined values and empty strings
     const updateData = Object.fromEntries(
-      Object.entries(data).filter(([_, value]) => value !== undefined && value !== '')
+      Object.entries(data).filter(([_, value]) => value !== undefined)
     );
 
     console.log('Storage: Cleaned update data:', updateData);
