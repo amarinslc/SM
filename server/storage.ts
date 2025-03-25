@@ -40,6 +40,7 @@ export interface IStorage {
   isEmailVerified(userId: number): Promise<boolean>;
   sendPasswordResetEmail(email: string): Promise<void>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
+  getFullUserData(id: number): Promise<User | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -54,12 +55,20 @@ export class DatabaseStorage implements IStorage {
 
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    if (!user) return undefined;
+
+    // Remove sensitive fields from the response
+    const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
+    return safeUser as User;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    if (!user) return undefined;
+
+    // Remove sensitive fields from the response
+    const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
+    return safeUser as User;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
@@ -606,6 +615,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
 
     return user?.emailVerified ?? false;
+  }
+
+  async getFullUserData(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    if (!user) return undefined;
+
+    // Only remove the password and tokens
+    const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...fullUser } = user;
+    return fullUser as User;
   }
 }
 

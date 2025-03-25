@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -16,7 +16,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
   bio: z.string().optional(),
-  photo: z.any().optional(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -26,6 +25,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
   const [photoPreview, setPhotoPreview] = useState<string | null>(user.photo || null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -38,7 +38,6 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
   const onSubmit = async (data: ProfileFormData) => {
     setIsSubmitting(true);
     try {
-      // Create FormData for multipart/form-data submission
       const formData = new FormData();
 
       // Only include fields that have changed
@@ -51,9 +50,8 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
       }
 
       // Handle photo upload
-      const photoInput = form.getValues('photo');
-      if (photoInput instanceof FileList && photoInput.length > 0) {
-        formData.append('photo', photoInput[0]);
+      if (fileInputRef.current?.files?.[0]) {
+        formData.append('photo', fileInputRef.current.files[0]);
       }
 
       // Check if there are any changes to submit
@@ -101,7 +99,7 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
   return (
     <Card className="p-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" encType="multipart/form-data">
           {/* Photo upload section */}
           <div className="flex flex-col items-center space-y-4">
             <Avatar className="w-24 h-24">
@@ -114,39 +112,26 @@ export function ProfileEditor({ user, onSuccess }: { user: User; onSuccess?: () 
               )}
             </Avatar>
 
-            <FormField
-              control={form.control}
-              name="photo"
-              render={({ field: { onChange, ...field } }) => (
-                <FormItem>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const input = document.createElement('input');
-                      input.type = 'file';
-                      input.accept = 'image/*';
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          // Pass the FileList directly from the input
-                          onChange((e.target as HTMLInputElement).files);
-                          setPhotoPreview(URL.createObjectURL(file));
-                        }
-                      };
-                      input.click();
-                    }}
-                  >
-                    Change Photo
-                  </Button>
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    {...field}
-                  />
-                </FormItem>
-              )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                fileInputRef.current?.click();
+              }}
+            >
+              Change Photo
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  setPhotoPreview(URL.createObjectURL(file));
+                }
+              }}
             />
           </div>
 

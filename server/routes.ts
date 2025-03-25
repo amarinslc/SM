@@ -45,18 +45,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
   app.get("/api/users/:id", async (req, res) => {
-    const user = await storage.getUser(parseInt(req.params.id));
-    if (!user) return res.status(404).send("User not found");
+    try {
+      const userId = parseInt(req.params.id);
 
-    // If viewing someone else's profile, never show email or sensitive data
-    if (!req.isAuthenticated() || req.user!.id !== user.id) {
-      const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...publicInfo } = user;
-      return res.json(publicInfo);
+      // If viewing own profile and authenticated, return full data
+      if (req.isAuthenticated() && req.user!.id === userId) {
+        const user = await storage.getFullUserData(userId);
+        if (!user) return res.status(404).send("User not found");
+        return res.json(user);
+      }
+
+      // Otherwise return public data only
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).send("User not found");
+      return res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user data" });
     }
+  });
 
-    // If it's the user's own profile, include email but not sensitive data
-    const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...userInfo } = user;
-    res.json(userInfo);
+  // Update the current user fetch route
+  app.get("/api/user", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const user = await storage.getFullUserData(req.user!.id);
+      if (!user) return res.status(404).send("User not found");
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      res.status(500).json({ error: "Failed to fetch user data" });
+    }
   });
 
   // Search endpoint should be before dynamic routes to avoid conflicts
