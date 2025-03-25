@@ -485,6 +485,7 @@ export class DatabaseStorage implements IStorage {
 
   async sendVerificationEmail(userId: number, email: string): Promise<void> {
     try {
+      console.log(`Starting verification email process for user ${userId} (${email})`);
       const token = (await randomBytesAsync(32)).toString('hex');
 
       await db
@@ -493,8 +494,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, userId));
 
       const verificationLink = `${process.env.APP_URL || 'http://localhost:5000'}/verify-email?token=${token}`;
+      console.log(`Generated verification link: ${verificationLink}`);
 
-      await resend.emails.send({
+      const emailResponse = await resend.emails.send({
         from: 'Dunbar <verification@dunbar.social>',
         to: email,
         subject: 'Verify your email address',
@@ -505,27 +507,34 @@ export class DatabaseStorage implements IStorage {
           <p>This link will expire in 24 hours.</p>
         `
       });
+
+      console.log('Resend API Response:', emailResponse);
     } catch (error) {
-      console.error('Failed to send verification email:', error);
+      console.error('Detailed error in sendVerificationEmail:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       throw new Error('Failed to send verification email. Please try again later.');
     }
   }
 
   async sendPasswordResetEmail(email: string): Promise<void> {
     try {
+      console.log(`Starting password reset email process for ${email}`);
       const [user] = await db
         .select()
         .from(users)
         .where(eq(users.email, email));
 
       if (!user) {
-        // Don't reveal if the email exists
+        console.log(`No user found with email ${email}`);
         return;
       }
 
       const token = (await randomBytesAsync(32)).toString('hex');
       const expires = new Date();
-      expires.setHours(expires.getHours() + 1); // Token expires in 1 hour
+      expires.setHours(expires.getHours() + 1);
 
       await db
         .update(users)
@@ -536,8 +545,9 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, user.id));
 
       const resetLink = `${process.env.APP_URL || 'http://localhost:5000'}/reset-password?token=${token}`;
+      console.log(`Generated reset link: ${resetLink}`);
 
-      await resend.emails.send({
+      const emailResponse = await resend.emails.send({
         from: 'Dunbar <noreply@dunbar.social>',
         to: email,
         subject: 'Reset your password',
@@ -549,8 +559,14 @@ export class DatabaseStorage implements IStorage {
           <p>If you didn't request this, please ignore this email.</p>
         `
       });
+
+      console.log('Resend API Response:', emailResponse);
     } catch (error) {
-      console.error('Failed to send password reset email:', error);
+      console.error('Detailed error in sendPasswordResetEmail:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       throw new Error('Failed to send password reset email. Please try again later.');
     }
   }

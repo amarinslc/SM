@@ -105,6 +105,7 @@ export function setupAuth(app: Express) {
       try {
         // Send verification email
         await storage.sendVerificationEmail(user.id, user.email);
+        console.log(`Verification email sent to ${user.email}`);
       } catch (error) {
         console.error('Failed to send verification email:', error);
         // Continue with login even if email fails
@@ -125,6 +126,7 @@ export function setupAuth(app: Express) {
   app.post("/api/forgot-password", async (req, res) => {
     try {
       const { email } = req.body;
+      console.log(`Processing password reset request for email: ${email}`);
       await storage.sendPasswordResetEmail(email);
       res.json({ message: "If an account exists with this email, you will receive password reset instructions." });
     } catch (error) {
