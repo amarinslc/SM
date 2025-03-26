@@ -32,14 +32,6 @@ export default function HomePage() {
 
   const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
     queryKey: ["/api/users/search", debouncedSearch],
-    queryFn: async () => {
-      if (!debouncedSearch.trim()) return [];
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(debouncedSearch)}`, {
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error('Search failed');
-      return await res.json();
-    },
     enabled: debouncedSearch.trim().length > 0,
   });
 
@@ -129,7 +121,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            {!isRequestsLoading && requests && requests.length > 0 && (
+            {requests && requests.length > 0 && (
               <PendingRequests requests={requests} />
             )}
 
