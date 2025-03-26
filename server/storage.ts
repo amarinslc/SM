@@ -96,7 +96,6 @@ export class DatabaseStorage implements IStorage {
           followerCount: users.followerCount,
           followingCount: users.followingCount,
           isPrivate: users.isPrivate,
-          emailVerified: users.emailVerified,
         })
         .from(users)
         .where(
