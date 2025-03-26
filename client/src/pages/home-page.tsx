@@ -3,19 +3,14 @@ import { PostForm } from "@/components/post-form";
 import { UserCard } from "@/components/user-card";
 import { PendingRequests } from "@/components/pending-requests";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, LogOut, Search, User as UserIcon } from "lucide-react";
-import { useState } from "react";
+import { Loader2, LogOut, User as UserIcon } from "lucide-react";
 import { Link } from "wouter";
-import { useDebounce } from "@/hooks/use-debounce";
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearch = useDebounce(searchQuery, 300);
 
   const { data: feed, isLoading: isFeedLoading } = useQuery<Post[]>({
     queryKey: ["/api/feed"],
@@ -30,38 +25,6 @@ export default function HomePage() {
     enabled: !!user?.id,
   });
 
-  const { data: searchResults, isLoading: isSearching, error: searchError } = useQuery<User[]>({
-    queryKey: ["/api/users/search", debouncedSearch],
-    queryFn: async () => {
-      if (!debouncedSearch.trim()) {
-        return [];
-      }
-
-      try {
-        const response = await fetch(
-          `/api/users/search?q=${encodeURIComponent(debouncedSearch.trim())}`,
-          { credentials: 'include' }
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || 'Search failed');
-        }
-
-        const data = await response.json();
-        if (!Array.isArray(data)) {
-          throw new Error('Invalid response format');
-        }
-
-        return data;
-      } catch (error) {
-        console.error('Search error:', error);
-        throw error;
-      }
-    },
-    enabled: debouncedSearch.trim().length > 0,
-  });
-
   if (!user) return null;
 
   return (
@@ -70,16 +33,6 @@ export default function HomePage() {
         <div className="container flex justify-between items-center h-16">
           <h1 className="text-2xl font-bold">Dunbar</h1>
           <div className="flex items-center gap-4">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-5 w-5 text-muted-foreground pointer-events-none" />
-              <Input
-                type="search"
-                placeholder="Search users..."
-                className="w-64 pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
             <Link href="/profile">
               <Button variant="ghost" size="icon">
                 <UserIcon className="h-5 w-5" />
@@ -97,31 +50,6 @@ export default function HomePage() {
       </header>
 
       <main className="container py-6">
-        {searchQuery && (
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold mb-4">Search Results</h2>
-            {isSearching ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : searchError ? (
-              <p className="text-red-500">Search failed. Please try again later.</p>
-            ) : searchResults?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.map((searchedUser) => (
-                  <UserCard
-                    key={searchedUser.id}
-                    user={searchedUser}
-                    isFollowing={following?.some((f) => f.id === searchedUser.id) ?? false}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No users found</p>
-            )}
-          </div>
-        )}
-
         <div className="grid md:grid-cols-[1fr_300px] gap-6">
           <div className="space-y-6">
             <PostForm />

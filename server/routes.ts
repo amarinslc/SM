@@ -19,7 +19,6 @@ try {
   await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
 }
 
-// Update multer configuration to accept video files
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
@@ -31,7 +30,7 @@ const upload = multer({
     },
   }),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit for video files
+    fileSize: 50 * 1024 * 1024,
   },
   fileFilter: (_req, file, cb) => {
     if (!file.originalname.match(/\.(jpg|jpeg|png|gif|mp4|webm|mov)$/i)) {
@@ -48,14 +47,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = parseInt(req.params.id);
 
-      // If viewing own profile and authenticated, return full data
       if (req.isAuthenticated() && req.user!.id === userId) {
         const user = await storage.getFullUserData(userId);
         if (!user) return res.status(404).send("User not found");
         return res.json(user);
       }
 
-      // Otherwise return public data only
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).send("User not found");
       return res.json(user);
@@ -65,7 +62,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update the current user fetch route
   app.get("/api/user", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
@@ -76,25 +72,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching current user:", error);
       res.status(500).json({ error: "Failed to fetch user data" });
-    }
-  });
-
-  // Search endpoint should be before dynamic routes to avoid conflicts
-  app.get("/api/users/search", async (req, res) => {
-    try {
-      // Validate and sanitize the search query
-      const searchQuery = req.query.q?.toString().trim();
-
-      if (!searchQuery) {
-        return res.json([]);
-      }
-
-      // Perform the search
-      const users = await storage.searchUsers(searchQuery);
-      res.json(users);
-    } catch (error) {
-      console.error("Search error:", error);
-      res.status(500).json({ error: "Search failed" });
     }
   });
 

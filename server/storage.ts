@@ -27,7 +27,6 @@ export interface IStorage {
   getPosts(userId: number, viewerId?: number): Promise<Post[]>;
   getFeed(userId: number): Promise<Post[]>;
   sessionStore: session.Store;
-  searchUsers(query: string): Promise<User[]>;
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
   getPendingFollowRequests(userId: number): Promise<any[]>;
@@ -79,39 +78,6 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.email, email));
     return user;
-  }
-
-  async searchUsers(query: string): Promise<User[]> {
-    try {
-      console.log(`Executing search query for: "${query}"`);
-
-      // First, get just the matching user IDs
-      const matchingUsers = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          name: users.name,
-          bio: users.bio,
-          photo: users.photo,
-          followerCount: sql<number>`COALESCE(${users.followerCount}, 0)`,
-          followingCount: sql<number>`COALESCE(${users.followingCount}, 0)`,
-          isPrivate: sql<boolean>`COALESCE(${users.isPrivate}, false)`,
-        })
-        .from(users)
-        .where(
-          or(
-            sql`LOWER(${users.username}) LIKE ${`%${query.toLowerCase()}%`}`,
-            sql`LOWER(${users.name}) LIKE ${`%${query.toLowerCase()}%`}`
-          )
-        )
-        .limit(20);
-
-      console.log(`Found ${matchingUsers.length} users matching query`);
-      return matchingUsers;
-    } catch (error) {
-      console.error("Search error:", error);
-      throw new Error("Search failed");
-    }
   }
 
   async createUser(user: InsertUser): Promise<User> {
