@@ -40,6 +40,7 @@ export interface IStorage {
   sendPasswordResetEmail(email: string): Promise<void>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
   getFullUserData(id: number): Promise<User | undefined>;
+  searchUsers(query: string): Promise<User[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -615,6 +616,35 @@ export class DatabaseStorage implements IStorage {
     // Remove only security-sensitive fields, keep profile data including email
     const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...fullUser } = user;
     return fullUser as User;
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    try {
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          name: users.name,
+          bio: users.bio,
+          photo: users.photo,
+          followerCount: sql`COALESCE(${users.followerCount}, 0)`,
+          followingCount: sql`COALESCE(${users.followingCount}, 0)`,
+          isPrivate: sql`COALESCE(${users.isPrivate}, false)`,
+        })
+        .from(users)
+        .where(
+          or(
+            sql`LOWER(${users.username}) LIKE ${`%${query.toLowerCase()}%`}`,
+            sql`LOWER(${users.name}) LIKE ${`%${query.toLowerCase()}%`}`
+          )
+        )
+        .limit(20);
+
+      return searchResults;
+    } catch (error) {
+      console.error("Search error:", error);
+      throw new Error("Failed to search users");
+    }
   }
 }
 

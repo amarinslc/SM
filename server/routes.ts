@@ -43,6 +43,23 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Add this before the other user routes to avoid conflicts with dynamic routes
+  app.get("/api/users/search", async (req, res) => {
+    try {
+      const query = req.query.q?.toString().trim() || "";
+
+      if (!query) {
+        return res.json([]);
+      }
+
+      const users = await storage.searchUsers(query);
+      res.json(users);
+    } catch (error) {
+      console.error("Search error:", error);
+      res.status(500).json({ error: "Failed to search users" });
+    }
+  });
+
   app.get("/api/users/:id", async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
