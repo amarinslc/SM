@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { pool } from "./db";
+import { pool, connect } from "./db";
 import path from "path";
 import fs from "fs/promises";
 
@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists with proper permissions
 const uploadsDir = path.join(process.cwd(), 'uploads');
 try {
   await fs.access(uploadsDir);
@@ -52,8 +52,7 @@ const RETRY_DELAY = 5000;
 
 async function connectWithRetry(retries: number = MAX_RETRIES): Promise<void> {
   try {
-    await pool.connect();
-    log("Database connection established");
+    await connect();
   } catch (error) {
     console.error("Database connection error:", error);
     if (retries > 0) {
@@ -66,10 +65,25 @@ async function connectWithRetry(retries: number = MAX_RETRIES): Promise<void> {
   }
 }
 
+// Graceful shutdown handling
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Closing database pool...');
   await pool.end();
   process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received. Closing database pool...');
+  await pool.end();
+  process.exit(0);
+});
+
+// Error handling middleware
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Server error:', err);
+  const status = err.status || err.statusCode || 500;
+  const message = err.message || "Internal Server Error";
+  res.status(status).json({ message });
 });
 
 (async () => {
@@ -78,14 +92,6 @@ process.on('SIGTERM', async () => {
     await connectWithRetry();
 
     const server = await registerRoutes(app);
-
-    // Error handling middleware
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      console.error('Server error:', err);
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-      res.status(status).json({ message });
-    });
 
     if (app.get("env") === "development") {
       await setupVite(app, server);
