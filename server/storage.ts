@@ -82,19 +82,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    // This will search all users with case-insensitive partial matches
-    const users = await db.select().from(users).where(
-      or(
-        sql`lower(${users.username}) like ${`%${query.toLowerCase()}%`}`,
-        sql`lower(${users.name}) like ${`%${query.toLowerCase()}%`}`
-      )
-    );
+    try {
+      // This will search all users with case-insensitive partial matches
+      const searchResults = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          name: users.name,
+          bio: users.bio,
+          photo: users.photo,
+          followerCount: users.followerCount,
+          followingCount: users.followingCount,
+          isPrivate: users.isPrivate,
+        })
+        .from(users)
+        .where(
+          or(
+            sql`lower(${users.username}) like ${`%${query.toLowerCase()}%`}`,
+            sql`lower(${users.name}) like ${`%${query.toLowerCase()}%`}`
+          )
+        );
 
-    // Remove sensitive information from search results
-    return users.map(user => {
-      const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
-      return safeUser as User;
-    });
+      return searchResults;
+    } catch (error) {
+      console.error('Search error:', error);
+      return [];
+    }
   }
 
   async createUser(user: InsertUser): Promise<User> {
