@@ -211,7 +211,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-
   app.post("/api/register", upload.single('photo'), async (req, res, next) => {
     console.log("Register attempt:", req.body.username);
     console.log("Photo file:", req.file);

@@ -85,31 +85,32 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Executing search query for: "${query}"`);
 
-      // Explicitly select only the fields we need and ensure proper types
-      const searchResults = await db
+      // First, get just the matching user IDs
+      const matchingUsers = await db
         .select({
           id: users.id,
           username: users.username,
           name: users.name,
           bio: users.bio,
           photo: users.photo,
-          followerCount: users.followerCount,
-          followingCount: users.followingCount,
-          isPrivate: users.isPrivate,
+          followerCount: sql<number>`COALESCE(${users.followerCount}, 0)`,
+          followingCount: sql<number>`COALESCE(${users.followingCount}, 0)`,
+          isPrivate: sql<boolean>`COALESCE(${users.isPrivate}, false)`,
         })
         .from(users)
         .where(
           or(
-            sql`lower(${users.username}) like ${`%${query.toLowerCase()}%`}`,
-            sql`lower(${users.name}) like ${`%${query.toLowerCase()}%`}`
+            sql`LOWER(${users.username}) LIKE ${`%${query.toLowerCase()}%`}`,
+            sql`LOWER(${users.name}) LIKE ${`%${query.toLowerCase()}%`}`
           )
-        );
+        )
+        .limit(20);
 
-      console.log(`Found ${searchResults.length} users matching query`);
-      return searchResults;
+      console.log(`Found ${matchingUsers.length} users matching query`);
+      return matchingUsers;
     } catch (error) {
       console.error("Search error:", error);
-      throw error;
+      throw new Error("Search failed");
     }
   }
 

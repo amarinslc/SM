@@ -33,22 +33,31 @@ export default function HomePage() {
   const { data: searchResults, isLoading: isSearching, error: searchError } = useQuery<User[]>({
     queryKey: ["/api/users/search", debouncedSearch],
     queryFn: async () => {
-      if (!debouncedSearch.trim()) return [];
-
-      const response = await fetch(`/api/users/search?q=${encodeURIComponent(debouncedSearch.trim())}`, {
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Search failed');
+      if (!debouncedSearch.trim()) {
+        return [];
       }
 
-      const data = await response.json();
-      if (!Array.isArray(data)) {
-        throw new Error('Invalid response format');
-      }
+      try {
+        const response = await fetch(
+          `/api/users/search?q=${encodeURIComponent(debouncedSearch.trim())}`,
+          { credentials: 'include' }
+        );
 
-      return data;
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Search failed');
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data)) {
+          throw new Error('Invalid response format');
+        }
+
+        return data;
+      } catch (error) {
+        console.error('Search error:', error);
+        throw error;
+      }
     },
     enabled: debouncedSearch.trim().length > 0,
   });
