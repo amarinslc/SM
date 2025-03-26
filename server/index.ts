@@ -2,10 +2,20 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { pool } from "./db";
+import path from "path";
+import fs from "fs/promises";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+try {
+  await fs.access(uploadsDir);
+} catch {
+  await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
+}
 
 // Add request logging
 app.use((req, res, next) => {
@@ -36,11 +46,36 @@ app.use((req, res, next) => {
   next();
 });
 
+// Database connection with retries
+const MAX_RETRIES = 5;
+const RETRY_DELAY = 5000;
+
+async function connectWithRetry(retries: number = MAX_RETRIES): Promise<void> {
+  try {
+    await pool.connect();
+    log("Database connection established");
+  } catch (error) {
+    console.error("Database connection error:", error);
+    if (retries > 0) {
+      log(`Retrying database connection in ${RETRY_DELAY/1000} seconds... (${retries} attempts remaining)`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+      await connectWithRetry(retries - 1);
+    } else {
+      throw new Error("Failed to connect to database after multiple attempts");
+    }
+  }
+}
+
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received. Closing database pool...');
+  await pool.end();
+  process.exit(0);
+});
+
 (async () => {
   try {
     // Ensure database connection is ready
-    await pool.connect();
-    log("Database connection established");
+    await connectWithRetry();
 
     const server = await registerRoutes(app);
 
@@ -58,8 +93,8 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
-    const port = 5000;
+    // Use deployment port or fallback to 5000
+    const port = process.env.PORT || 5000;
     server.listen({
       port,
       host: "0.0.0.0",
