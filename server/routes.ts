@@ -43,20 +43,24 @@ const upload = multer({
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
-  // Add this before the other user routes to avoid conflicts with dynamic routes
+  // Add this before other user routes to avoid conflicts
   app.get("/api/users/search", async (req, res) => {
     try {
-      const query = req.query.q?.toString().trim() || "";
+      const query = req.query.q?.toString() || "";
 
-      if (!query) {
+      // If no query provided, return empty array
+      if (!query.trim()) {
         return res.json([]);
       }
 
       const users = await storage.searchUsers(query);
-      res.json(users);
+      return res.json(users);
     } catch (error) {
       console.error("Search error:", error);
-      res.status(500).json({ error: "Failed to search users" });
+      res.status(500).json({ 
+        error: "Failed to search users",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

@@ -30,9 +30,26 @@ export default function HomePage() {
     enabled: !!user?.id,
   });
 
-  const { data: searchResults, isLoading: isSearching } = useQuery<User[]>({
+  const { data: searchResults, isLoading: isSearching, error: searchError } = useQuery<User[]>({
     queryKey: ["/api/users/search", debouncedSearch],
-    enabled: debouncedSearch.length > 0,
+    queryFn: async () => {
+      if (!debouncedSearch.trim()) {
+        return [];
+      }
+
+      const response = await fetch(
+        `/api/users/search?q=${encodeURIComponent(debouncedSearch.trim())}`,
+        { credentials: 'include' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to search users');
+      }
+
+      const data = await response.json();
+      return data;
+    },
+    enabled: debouncedSearch.trim().length > 0,
   });
 
   if (!user) return null;
@@ -77,6 +94,8 @@ export default function HomePage() {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : searchError ? (
+              <p className="text-red-500">Failed to search users. Please try again.</p>
             ) : searchResults?.length ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {searchResults.map((searchedUser) => (

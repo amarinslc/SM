@@ -620,6 +620,13 @@ export class DatabaseStorage implements IStorage {
 
   async searchUsers(query: string): Promise<User[]> {
     try {
+      // Normalize the search query
+      const normalizedQuery = query.toLowerCase().trim();
+
+      if (!normalizedQuery) {
+        return [];
+      }
+
       const searchResults = await db
         .select({
           id: users.id,
@@ -627,17 +634,19 @@ export class DatabaseStorage implements IStorage {
           name: users.name,
           bio: users.bio,
           photo: users.photo,
-          followerCount: sql`COALESCE(${users.followerCount}, 0)`,
-          followingCount: sql`COALESCE(${users.followingCount}, 0)`,
-          isPrivate: sql`COALESCE(${users.isPrivate}, false)`,
+          followerCount: sql`COALESCE(${users.followerCount}, 0)::integer`,
+          followingCount: sql`COALESCE(${users.followingCount}, 0)::integer`,
+          isPrivate: sql`COALESCE(${users.isPrivate}, false)::boolean`,
+          emailVerified: users.emailVerified,
         })
         .from(users)
         .where(
           or(
-            sql`LOWER(${users.username}) LIKE ${`%${query.toLowerCase()}%`}`,
-            sql`LOWER(${users.name}) LIKE ${`%${query.toLowerCase()}%`}`
+            sql`LOWER(${users.username}) LIKE ${`%${normalizedQuery}%`}`,
+            sql`LOWER(${users.name}) LIKE ${`%${normalizedQuery}%`}`
           )
         )
+        .orderBy(users.username)
         .limit(20);
 
       return searchResults;
