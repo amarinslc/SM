@@ -10,12 +10,12 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL must be set. Did you forget to provision a database?");
 }
 
-// Create connection pool with proper configuration
+// Create connection pool with Neon-recommended configuration
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  maxRetries: 5,
-  retryDelay: 2000, // 2 seconds between retries
-  connectionTimeoutMillis: 10000, // 10 second timeout
+  max: 1, // Limit pool size
+  idleTimeoutMillis: 120000, // 2 minute timeout
+  connectionTimeoutMillis: 10000, // 10 second connection timeout
 });
 
 // Add event listeners for connection issues
