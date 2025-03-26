@@ -83,6 +83,8 @@ export class DatabaseStorage implements IStorage {
 
   async searchUsers(query: string): Promise<User[]> {
     try {
+      console.log(`Executing search query for: "${query}"`);
+
       // This will search all users with case-insensitive partial matches
       const searchResults = await db
         .select({
@@ -94,6 +96,7 @@ export class DatabaseStorage implements IStorage {
           followerCount: users.followerCount,
           followingCount: users.followingCount,
           isPrivate: users.isPrivate,
+          emailVerified: users.emailVerified,
         })
         .from(users)
         .where(
@@ -103,10 +106,11 @@ export class DatabaseStorage implements IStorage {
           )
         );
 
+      console.log(`Found ${searchResults.length} users matching query`);
       return searchResults;
     } catch (error) {
       console.error('Search error:', error);
-      return [];
+      throw new Error('Search failed');
     }
   }
 
