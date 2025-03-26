@@ -86,7 +86,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
+      console.log("Search request received:", req.query.q);
       const users = await storage.searchUsers(req.query.q.toString());
+      console.log("Search results:", users);
       res.json(users);
     } catch (error) {
       console.error("Search error:", error);

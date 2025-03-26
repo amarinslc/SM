@@ -108,8 +108,8 @@ export class DatabaseStorage implements IStorage {
       console.log(`Found ${searchResults.length} users matching query`);
       return searchResults;
     } catch (error) {
-      console.error('Search error:', error);
-      throw new Error('Search failed');
+      console.error("Search error:", error);
+      throw new Error("Search failed");
     }
   }
 
