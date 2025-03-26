@@ -54,21 +54,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
     if (!user) return undefined;
 
-    // Always remove sensitive fields for public profile
+    // Remove sensitive fields for public profile
     const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
     return safeUser as User;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    if (!user) return undefined;
-
-    // Always remove sensitive fields for public profile
-    const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
-    return safeUser as User;
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+    return user;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
