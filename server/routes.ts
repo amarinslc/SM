@@ -86,16 +86,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const searchQuery = req.query.q?.toString().trim();
 
       if (!searchQuery) {
-        console.log("Empty search query received");
         return res.json([]);
       }
 
-      console.log(`Processing search request for query: "${searchQuery}"`);
-
       // Perform the search
       const users = await storage.searchUsers(searchQuery);
-
-      console.log(`Search complete. Found ${users.length} results`);
       res.json(users);
     } catch (error) {
       console.error("Search error:", error);

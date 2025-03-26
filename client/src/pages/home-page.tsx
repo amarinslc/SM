@@ -34,13 +34,21 @@ export default function HomePage() {
     queryKey: ["/api/users/search", debouncedSearch],
     queryFn: async () => {
       if (!debouncedSearch.trim()) return [];
+
       const response = await fetch(`/api/users/search?q=${encodeURIComponent(debouncedSearch.trim())}`, {
         credentials: 'include'
       });
+
       if (!response.ok) {
         throw new Error('Search failed');
       }
-      return response.json();
+
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid response format');
+      }
+
+      return data;
     },
     enabled: debouncedSearch.trim().length > 0,
   });

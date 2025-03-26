@@ -85,7 +85,7 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Executing search query for: "${query}"`);
 
-      // This will search all users with case-insensitive partial matches
+      // Explicitly select only the fields we need and ensure proper types
       const searchResults = await db
         .select({
           id: users.id,
@@ -109,7 +109,7 @@ export class DatabaseStorage implements IStorage {
       return searchResults;
     } catch (error) {
       console.error("Search error:", error);
-      throw new Error("Search failed");
+      throw error;
     }
   }
 
