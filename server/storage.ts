@@ -49,8 +49,8 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     this.sessionStore = new PostgresSessionStore({
       pool,
-      createTableIfMissing: true,
-      tableName: 'sessions',
+      createTableIfMissing: false, // Don't try to create the table as it already exists
+      tableName: 'session', // Default table name used by connect-pg-simple
       // Connection handling settings
       pruneSessionInterval: 60, // How frequently to delete expired sessions (in seconds)
       // Error handling - don't crash on session store errors
