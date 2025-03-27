@@ -46,13 +46,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Database connection with retries
+// Database connection with retries and keep-alive
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 5000;
+const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+
+let isShuttingDown = false;
+let healthCheckTimer: NodeJS.Timeout | null = null;
 
 async function connectWithRetry(retries: number = MAX_RETRIES): Promise<void> {
   try {
     await connect();
+    setupHealthCheck();
   } catch (error) {
     console.error("Database connection error:", error);
     if (retries > 0) {
@@ -65,18 +70,68 @@ async function connectWithRetry(retries: number = MAX_RETRIES): Promise<void> {
   }
 }
 
+function setupHealthCheck() {
+  // Clear any existing health check timer
+  if (healthCheckTimer) {
+    clearInterval(healthCheckTimer);
+  }
+
+  // Set up a periodic health check to keep the connection alive
+  healthCheckTimer = setInterval(async () => {
+    if (isShuttingDown) return;
+    
+    try {
+      // Get a client from the pool and execute a simple query
+      const client = await pool.connect();
+      try {
+        await client.query('SELECT 1'); // Simple query to check connection
+        console.log("Database health check: OK");
+      } catch (err) {
+        console.error("Database health check failed:", err);
+      } finally {
+        client.release(); // Always release the client
+      }
+    } catch (err) {
+      console.error("Failed to get client for health check:", err);
+    }
+  }, HEALTH_CHECK_INTERVAL);
+}
+
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received. Closing database pool...');
-  await pool.end();
-  process.exit(0);
+  await gracefulShutdown();
 });
 
 process.on('SIGINT', async () => {
   console.log('SIGINT received. Closing database pool...');
-  await pool.end();
-  process.exit(0);
+  await gracefulShutdown();
 });
+
+async function gracefulShutdown() {
+  isShuttingDown = true;
+  
+  // Clear health check timer
+  if (healthCheckTimer) {
+    clearInterval(healthCheckTimer);
+    healthCheckTimer = null;
+  }
+  
+  try {
+    // Close pool with timeout
+    const poolClosePromise = pool.end();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Pool close timed out')), 5000)
+    );
+    
+    await Promise.race([poolClosePromise, timeoutPromise]);
+    console.log('Database pool closed successfully');
+  } catch (err) {
+    console.error('Error closing database pool:', err);
+  }
+  
+  process.exit(0);
+}
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

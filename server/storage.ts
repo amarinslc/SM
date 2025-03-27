@@ -50,6 +50,11 @@ export class DatabaseStorage implements IStorage {
     this.sessionStore = new PostgresSessionStore({
       pool,
       createTableIfMissing: true,
+      tableName: 'sessions',
+      // Connection handling settings
+      pruneSessionInterval: 60, // How frequently to delete expired sessions (in seconds)
+      // Error handling - don't crash on session store errors
+      errorLog: (err) => console.error('Session store error:', err),
     });
   }
 
