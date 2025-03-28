@@ -11,11 +11,17 @@ import { hashPassword } from './auth';
 import { db } from './db';
 import { and, eq } from 'drizzle-orm';
 
-// Ensure uploads directory exists with proper permissions
-const uploadsDir = path.join(process.cwd(), 'uploads');
+// Use Replit's persistent .data folder for file storage
+const uploadsDir = path.join(process.cwd(), '.data', 'uploads');
 try {
   await fs.access(uploadsDir);
 } catch {
+  // Create the .data directory first if it doesn't exist
+  try {
+    await fs.access(path.join(process.cwd(), '.data'));
+  } catch {
+    await fs.mkdir(path.join(process.cwd(), '.data'), { recursive: true, mode: 0o755 });
+  }
   await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
 }
 
@@ -377,8 +383,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  // Serve uploaded files from the persistent .data directory
+  app.use('/uploads', express.static(path.join(process.cwd(), '.data', 'uploads')));
 
   const httpServer = createServer(app);
   return httpServer;
