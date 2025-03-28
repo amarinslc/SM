@@ -39,7 +39,10 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
               <Avatar className="h-20 w-20">
                 {user.photo ? (
                   <AvatarImage 
-                    src={user.photo} 
+                    // Try to fix the path if it doesn't start with /
+                    src={user.photo && (user.photo.startsWith('/') || user.photo.startsWith('http')) 
+                      ? user.photo 
+                      : user.photo ? `/${user.photo}` : ''}
                     alt={`${user.name}'s profile photo`} 
                     onError={(e) => {
                       // If image fails to load, show fallback

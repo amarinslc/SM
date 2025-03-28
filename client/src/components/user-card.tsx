@@ -97,7 +97,10 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
           <Avatar className="h-12 w-12 cursor-pointer">
             {user.photo ? (
               <AvatarImage 
-                src={user.photo} 
+                // Try to fix the path if it doesn't start with /
+                src={user.photo && (user.photo.startsWith('/') || user.photo.startsWith('http')) 
+                  ? user.photo 
+                  : user.photo ? `/${user.photo}` : ''} 
                 alt={`${user.name}'s profile photo`} 
                 onError={(e) => {
                   // If image fails to load, show fallback

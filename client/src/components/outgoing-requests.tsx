@@ -30,7 +30,10 @@ export function OutgoingRequests({ requests }: OutgoingRequestsProps) {
                 <Avatar>
                   {request.following.photo ? (
                     <AvatarImage 
-                      src={request.following.photo} 
+                      // Try to fix the path if it doesn't start with /
+                      src={request.following.photo && (request.following.photo.startsWith('/') || request.following.photo.startsWith('http')) 
+                          ? request.following.photo 
+                          : request.following.photo ? `/${request.following.photo}` : ''}
                       alt={`${request.following.name}'s profile photo`} 
                       onError={(e) => {
                         // If image fails to load, show fallback

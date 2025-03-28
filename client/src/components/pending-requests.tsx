@@ -108,7 +108,10 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
                 <Avatar>
                   {request.follower.photo ? (
                     <AvatarImage 
-                      src={request.follower.photo} 
+                      // Try to fix the path if it doesn't start with /
+                      src={request.follower.photo && (request.follower.photo.startsWith('/') || request.follower.photo.startsWith('http')) 
+                          ? request.follower.photo 
+                          : request.follower.photo ? `/${request.follower.photo}` : ''}
                       alt={`${request.follower.name}'s profile photo`} 
                       onError={(e) => {
                         // If image fails to load, show fallback
