@@ -86,7 +86,20 @@ export function PostCard({ post }: PostCardProps) {
       <CardHeader className="flex-row space-x-4 items-center">
         <Link href={`/profile/${author.id}`}>
           <Avatar className="cursor-pointer">
-            <AvatarImage src={author.photo || undefined} />
+            {author.photo ? (
+              <AvatarImage 
+                src={author.photo.startsWith('/') || author.photo.startsWith('http') 
+                  ? author.photo 
+                  : `/${author.photo}`}
+                onError={(e) => {
+                  // Hide the image immediately if it fails to load
+                  e.currentTarget.style.display = 'none';
+                  // Make sure fallback is visible
+                  const fallback = e.currentTarget.parentElement?.querySelector('[role="img"]') as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+            ) : null}
             <AvatarFallback>{author.name[0].toUpperCase()}</AvatarFallback>
           </Avatar>
         </Link>

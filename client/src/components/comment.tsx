@@ -20,8 +20,21 @@ export function CommentView({ comment }: CommentProps) {
       <Link href={`/profile/${author.id}`}>
         <a>
           <Avatar className="h-8 w-8">
-            <AvatarImage src={author.avatar || undefined} />
-            <AvatarFallback>{author.name[0]}</AvatarFallback>
+            {author.photo ? (
+              <AvatarImage 
+                src={author.photo.startsWith('/') || author.photo.startsWith('http') 
+                  ? author.photo 
+                  : `/${author.photo}`}
+                onError={(e) => {
+                  // Hide the image immediately if it fails to load
+                  e.currentTarget.style.display = 'none';
+                  // Make sure fallback is visible
+                  const fallback = e.currentTarget.parentElement?.querySelector('[role="img"]') as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <AvatarFallback>{author.name[0].toUpperCase()}</AvatarFallback>
           </Avatar>
         </a>
       </Link>
