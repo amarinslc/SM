@@ -30,6 +30,7 @@ export interface IStorage {
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
   getPendingFollowRequests(userId: number): Promise<any[]>;
+  getOutgoingFollowRequests(userId: number): Promise<any[]>;
   acceptFollowRequest(followerId: number, followingId: number): Promise<void>;
   rejectFollowRequest(followerId: number, followingId: number): Promise<void>;
   getPost(id: number): Promise<Post | undefined>;
@@ -396,6 +397,25 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .innerJoin(users, eq(users.id, follows.followerId));
+
+    return requests;
+  }
+  
+  async getOutgoingFollowRequests(userId: number): Promise<any[]> {
+    const requests = await db
+      .select({
+        id: follows.followingId,
+        following: users,
+        createdAt: follows.createdAt,
+      })
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, userId),
+          eq(follows.isPending, true)
+        )
+      )
+      .innerJoin(users, eq(users.id, follows.followingId));
 
     return requests;
   }

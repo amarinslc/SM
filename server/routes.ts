@@ -186,6 +186,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to get requests" });
     }
   });
+  
+  app.get("/api/users/:id/outgoing-requests", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const requests = await storage.getOutgoingFollowRequests(parseInt(req.params.id));
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting outgoing requests:", error);
+      res.status(500).json({ error: "Failed to get outgoing requests" });
+    }
+  });
 
   app.post("/api/users/requests/:id/accept", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

@@ -11,6 +11,7 @@ import { PostCard } from "@/components/post-card";
 import { UserListDrawer } from "@/components/user-list-drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PendingRequests } from "@/components/pending-requests";
+import { OutgoingRequests } from "@/components/outgoing-requests";
 import { Badge } from "@/components/ui/badge";
 
 type ListType = "followers" | "following" | null;
@@ -107,9 +108,15 @@ export function ProfilePage() {
     enabled: !!user,
   });
   
-  // Always call this hook, but conditionally based on whether this is the current user's profile
+  // Get pending incoming follow requests (people who want to follow you)
   const { data: pendingRequests, isLoading: isPendingRequestsLoading } = useQuery<any[]>({
     queryKey: [`/api/users/${currentUser?.id || 0}/requests`],
+    enabled: !!currentUser?.id && isOwnProfileCalculated === true,
+  });
+  
+  // Get outgoing follow requests (people you've requested to follow)
+  const { data: outgoingRequests, isLoading: isOutgoingRequestsLoading } = useQuery<any[]>({
+    queryKey: [`/api/users/${currentUser?.id || 0}/outgoing-requests`],
     enabled: !!currentUser?.id && isOwnProfileCalculated === true,
   });
   
@@ -131,6 +138,7 @@ export function ProfilePage() {
   // Use the safe version we calculated earlier
   const isOwnProfile = isOwnProfileCalculated;
   const hasPendingRequests = isOwnProfile && pendingRequests && Array.isArray(pendingRequests) && pendingRequests.length > 0;
+  const hasOutgoingRequests = isOwnProfile && outgoingRequests && Array.isArray(outgoingRequests) && outgoingRequests.length > 0;
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -156,18 +164,30 @@ export function ProfilePage() {
           <ProfileView user={user} onEdit={isOwnProfile ? () => setIsEditing(true) : undefined} isOwnProfile={!!isOwnProfile} />
         )}
 
-        {hasPendingRequests && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold flex items-center">
-                  Pending Follow Requests
-                  <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>
-                </h2>
-              </div>
-              <PendingRequests requests={pendingRequests} />
-            </CardContent>
-          </Card>
+        {isOwnProfile && (
+          <div className="space-y-6">
+            {hasPendingRequests && (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-semibold flex items-center">
+                      Pending Follow Requests
+                      <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>
+                    </h2>
+                  </div>
+                  <PendingRequests requests={pendingRequests} />
+                </CardContent>
+              </Card>
+            )}
+            
+            {hasOutgoingRequests && (
+              <Card>
+                <CardContent className="pt-6">
+                  <OutgoingRequests requests={outgoingRequests} />
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
 
         <div className="mt-8">
