@@ -96,6 +96,7 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
         title={listType === "followers" ? "Followers" : "Following"}
         users={listType === "followers" ? followers : following}
         isLoading={listType === "followers" ? isFollowersLoading : isFollowingLoading}
+        listType={listType}
       />
     </>
   );

@@ -200,6 +200,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).send((error as Error).message);
     }
   });
+  
+  // New endpoint to remove a follower
+  app.post("/api/users/:id/remove-follower", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const followerId = parseInt(req.params.id);
+      const userId = req.user!.id;
+      
+      if (isNaN(followerId)) {
+        return res.status(400).json({ error: "Invalid follower ID" });
+      }
+      
+      await storage.removeFollower(userId, followerId);
+      res.status(200).json({ message: "Follower removed successfully" });
+    } catch (error) {
+      console.error("Error removing follower:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
 
   app.get("/api/users/:id/followers", async (req, res) => {
     const followers = await storage.getFollowers(parseInt(req.params.id));
@@ -512,6 +532,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error promoting user to admin:", error);
       res.status(500).json({
         error: "Failed to promote user",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Add route for admin to delete users
+  app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid user ID" });
+      }
+      
+      // Check if user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Don't allow admins to delete themselves
+      if (userId === req.user!.id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+      
+      await storage.deleteUser(userId);
+      
+      res.json({
+        message: `User with ID ${userId} has been deleted`
+      });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({
+        error: "Failed to delete user",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }

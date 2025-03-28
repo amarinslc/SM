@@ -21,6 +21,7 @@ export interface IStorage {
   updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User>;
   followUser(followerId: number, followingId: number): Promise<void>;
   unfollowUser(followerId: number, followingId: number): Promise<void>;
+  removeFollower(userId: number, followerId: number): Promise<void>;
   getFollowers(userId: number): Promise<User[]>;
   getFollowing(userId: number): Promise<User[]>;
   createPost(userId: number, content: string, media: any[]): Promise<Post>;
@@ -42,6 +43,7 @@ export interface IStorage {
   resetPassword(token: string, newPassword: string): Promise<boolean>;
   getFullUserData(id: number): Promise<User | undefined>;
   searchUsers(query: string): Promise<User[]>;
+  deleteUser(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -198,6 +200,52 @@ export class DatabaseStorage implements IStorage {
           followerCount: sql`GREATEST(${users.followerCount} - 1, 0)`
         })
         .where(eq(users.id, followingId));
+    });
+  }
+  
+  async removeFollower(userId: number, followerId: number): Promise<void> {
+    // Check if the relationship exists first (follower follows this user)
+    const [existing] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, userId),
+          eq(follows.isPending, false) // Only remove confirmed followers
+        )
+      );
+
+    if (!existing) {
+      throw new Error("This user is not your follower");
+    }
+
+    await db.transaction(async (tx) => {
+      // Remove follow relationship
+      await tx
+        .delete(follows)
+        .where(
+          and(
+            eq(follows.followerId, followerId),
+            eq(follows.followingId, userId)
+          )
+        );
+
+      // Update follower count for the user removing the follower
+      await tx
+        .update(users)
+        .set({
+          followerCount: sql`GREATEST(${users.followerCount} - 1, 0)`
+        })
+        .where(eq(users.id, userId));
+
+      // Update following count for the removed follower
+      await tx
+        .update(users)
+        .set({
+          followingCount: sql`GREATEST(${users.followingCount} - 1, 0)`
+        })
+        .where(eq(users.id, followerId));
     });
   }
 
@@ -666,9 +714,13 @@ export class DatabaseStorage implements IStorage {
         })
         .from(users)
         .where(
-          or(
-            sql`LOWER(${users.username}) LIKE ${`%${normalizedQuery}%`}`,
-            sql`LOWER(${users.name}) LIKE ${`%${normalizedQuery}%`}`
+          and(
+            or(
+              sql`LOWER(${users.username}) LIKE ${`%${normalizedQuery}%`}`,
+              sql`LOWER(${users.name}) LIKE ${`%${normalizedQuery}%`}`
+            ),
+            // Exclude admin users from search results
+            sql`(${users.role} IS NULL OR ${users.role} != 'admin')`
           )
         )
         .orderBy(users.username)
@@ -679,6 +731,53 @@ export class DatabaseStorage implements IStorage {
       console.error("Search error:", error);
       throw new Error("Failed to search users");
     }
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    // Only admin users should be able to delete users, 
+    // but the permission check should be done at the route level
+
+    // Check if user exists
+    const [userToDelete] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, id));
+
+    if (!userToDelete) {
+      throw new Error("User not found");
+    }
+
+    // Prevent deleting admin users for safety
+    if (userToDelete.role === 'admin') {
+      throw new Error("Cannot delete admin users");
+    }
+
+    await db.transaction(async (tx) => {
+      // Delete user posts
+      await tx
+        .delete(posts)
+        .where(eq(posts.userId, id));
+
+      // Delete user comments
+      await tx
+        .delete(comments)
+        .where(eq(comments.userId, id));
+
+      // Delete user follow relationships (both as follower and following)
+      await tx
+        .delete(follows)
+        .where(
+          or(
+            eq(follows.followerId, id),
+            eq(follows.followingId, id)
+          )
+        );
+
+      // Finally delete the user
+      await tx
+        .delete(users)
+        .where(eq(users.id, id));
+    });
   }
 }
 

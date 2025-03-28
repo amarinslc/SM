@@ -10,9 +10,17 @@ interface UserListDrawerProps {
   title: string;
   users?: User[];
   isLoading: boolean;
+  listType?: "followers" | "following" | null;
 }
 
-export function UserListDrawer({ open, onClose, title, users, isLoading }: UserListDrawerProps) {
+export function UserListDrawer({ 
+  open, 
+  onClose, 
+  title, 
+  users, 
+  isLoading, 
+  listType 
+}: UserListDrawerProps) {
   return (
     <Drawer open={open} onOpenChange={onClose}>
       <DrawerContent className="max-h-[70vh]">
@@ -27,7 +35,12 @@ export function UserListDrawer({ open, onClose, title, users, isLoading }: UserL
               </div>
             ) : users?.length ? (
               users.map((user) => (
-                <UserCard key={user.id} user={user} isFollowing={false} />
+                <UserCard 
+                  key={user.id} 
+                  user={user} 
+                  isFollowing={listType === "following"}
+                  showRemoveFollower={listType === "followers"}
+                />
               ))
             ) : (
               <p className="text-muted-foreground text-center">No users found</p>

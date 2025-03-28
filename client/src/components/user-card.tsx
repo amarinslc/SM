@@ -6,15 +6,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserMinus } from "lucide-react";
 import { Link } from "wouter";
 
 interface UserCardProps {
   user: User;
   isFollowing: boolean;
+  showRemoveFollower?: boolean;
 }
 
-export function UserCard({ user, isFollowing }: UserCardProps) {
+export function UserCard({ user, isFollowing, showRemoveFollower = false }: UserCardProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
@@ -88,6 +89,37 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
     },
   });
 
+  // Mutation for removing a follower
+  const removeFollowerMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/users/${user.id}/remove-follower`);
+    },
+    onSuccess: () => {
+      // Invalidate all relevant queries
+      if (currentUser?.id) {
+        // Invalidate followers list
+        queryClient.invalidateQueries({
+          queryKey: [`/api/users/${currentUser.id}/followers`],
+        });
+        
+        // Invalidate the current user data
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      }
+      
+      toast({
+        title: "Follower Removed",
+        description: `${user.name} has been removed from your followers`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Action failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   if (currentUser?.id === user.id) return null;
 
   return (
@@ -134,22 +166,41 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
             <span className="text-sm text-muted-foreground ml-1">following</span>
           </div>
         </div>
-        <Button
-          variant={isFollowing ? "outline" : "default"}
-          className="w-full mt-4"
-          onClick={() => followMutation.mutate()}
-          disabled={followMutation.isPending || hasPendingRequest}
-        >
-          {followMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : hasPendingRequest ? (
-            "Request Pending"
-          ) : isFollowing ? (
-            "Unfollow"
-          ) : (
-            "Follow"
-          )}
-        </Button>
+        
+        {showRemoveFollower ? (
+          <Button
+            variant="outline"
+            className="w-full mt-4"
+            onClick={() => removeFollowerMutation.mutate()}
+            disabled={removeFollowerMutation.isPending}
+          >
+            {removeFollowerMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <>
+                <UserMinus className="h-4 w-4 mr-2" />
+                Remove Follower
+              </>
+            )}
+          </Button>
+        ) : (
+          <Button
+            variant={isFollowing ? "outline" : "default"}
+            className="w-full mt-4"
+            onClick={() => followMutation.mutate()}
+            disabled={followMutation.isPending || hasPendingRequest}
+          >
+            {followMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : hasPendingRequest ? (
+              "Request Pending"
+            ) : isFollowing ? (
+              "Unfollow"
+            ) : (
+              "Follow"
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
