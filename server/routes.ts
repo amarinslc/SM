@@ -28,7 +28,13 @@ try {
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
-      cb(null, uploadsDir);
+      // Ensure the destination exists
+      fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 })
+        .then(() => cb(null, uploadsDir))
+        .catch(err => {
+          console.error('Error creating uploads directory:', err);
+          cb(err, '');
+        });
     },
     filename: (_req, file, cb) => {
       const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
@@ -383,8 +389,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Serve uploaded files from the persistent .data directory
+  // Serve uploaded files from both locations during transition
+  // First try the persistent storage
   app.use('/uploads', express.static(path.join(process.cwd(), '.data', 'uploads')));
+  
+  // Then try the old location as fallback for existing files
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   const httpServer = createServer(app);
   return httpServer;
