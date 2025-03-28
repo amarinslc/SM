@@ -96,10 +96,18 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
         <Link href={`/profile/${user.id}`}>
           <Avatar className="h-12 w-12 cursor-pointer">
             {user.photo ? (
-              <AvatarImage src={user.photo} alt={`${user.name}'s profile photo`} />
-            ) : (
-              <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
-            )}
+              <AvatarImage 
+                src={user.photo} 
+                alt={`${user.name}'s profile photo`} 
+                onError={(e) => {
+                  // If image fails to load, show fallback
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('[role="img"]') as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
           </Avatar>
         </Link>
         <div className="flex flex-col">

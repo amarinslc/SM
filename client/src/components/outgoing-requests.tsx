@@ -29,10 +29,18 @@ export function OutgoingRequests({ requests }: OutgoingRequestsProps) {
               <div className="flex items-center gap-2 cursor-pointer">
                 <Avatar>
                   {request.following.photo ? (
-                    <AvatarImage src={request.following.photo} alt={`${request.following.name}'s profile photo`} />
-                  ) : (
-                    <AvatarFallback>{request.following.name[0].toUpperCase()}</AvatarFallback>
-                  )}
+                    <AvatarImage 
+                      src={request.following.photo} 
+                      alt={`${request.following.name}'s profile photo`} 
+                      onError={(e) => {
+                        // If image fails to load, show fallback
+                        e.currentTarget.style.display = 'none';
+                        const fallback = e.currentTarget.parentElement?.querySelector('[role="img"]') as HTMLElement;
+                        if (fallback) fallback.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <AvatarFallback>{request.following.name[0].toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="font-medium">{request.following.name}</div>
