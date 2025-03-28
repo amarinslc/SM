@@ -10,6 +10,13 @@ import express from 'express';
 import { hashPassword } from './auth';
 import { db } from './db';
 import { and, eq } from 'drizzle-orm';
+import { uploadToCloudinary } from './cloudinary';
+import { 
+  checkFileExists, 
+  runFullVerification, 
+  verifyAndRepairUserPhotos, 
+  verifyAndRepairPostMedia 
+} from './file-verification';
 
 // Use Replit's persistent .data folder for file storage
 const uploadsDir = path.join(process.cwd(), '.data', 'uploads');
@@ -122,9 +129,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Handle photo upload
+      // Handle photo upload - now with Cloudinary
       if (req.file) {
-        updateData.photo = `/uploads/${req.file.filename}`;
+        try {
+          // Upload to Cloudinary
+          const result = await uploadToCloudinary(req.file.path, {
+            folder: 'dunbar/users',
+          });
+          
+          // Use the Cloudinary secure URL for the photo
+          updateData.photo = result.secure_url;
+          
+          console.log(`Uploaded user photo to Cloudinary: ${result.secure_url}`);
+        } catch (err) {
+          console.error('Cloudinary upload failed:', err);
+          // Fall back to local storage if Cloudinary fails
+          updateData.photo = `/uploads/${req.file.filename}`;
+          console.log(`Falling back to local storage: ${updateData.photo}`);
+        }
       }
 
       // Check if there are any changes to update
@@ -256,7 +278,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate photo path if file was uploaded
       let photoPath = '';
       if (req.file) {
-        photoPath = `/uploads/${req.file.filename}`;
+        try {
+          // Upload to Cloudinary
+          const result = await uploadToCloudinary(req.file.path, {
+            folder: 'dunbar/users',
+          });
+          
+          // Use the Cloudinary secure URL for the photo
+          photoPath = result.secure_url;
+          
+          console.log(`Uploaded user photo to Cloudinary: ${photoPath}`);
+        } catch (err) {
+          console.error('Cloudinary upload failed during registration:', err);
+          // Fall back to local storage if Cloudinary fails
+          photoPath = `/uploads/${req.file.filename}`;
+          console.log(`Falling back to local storage: ${photoPath}`);
+        }
       }
 
       const user = await storage.createUser({
@@ -277,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update post creation to handle video files
+  // Update post creation to handle video files and use Cloudinary
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
@@ -293,10 +330,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (files && files.length > 0) {
         for (const file of files) {
           console.log('Processing file:', file.originalname, 'mimetype:', file.mimetype);
-          media.push({
-            type: file.mimetype.startsWith('video/') ? 'video' : 'image',
-            url: `/uploads/${file.filename}`
-          });
+          
+          const fileType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+          
+          try {
+            // Upload to Cloudinary
+            const result = await uploadToCloudinary(file.path, {
+              folder: 'dunbar/posts',
+              resource_type: fileType === 'video' ? 'video' : 'image'
+            });
+            
+            // Add the media with Cloudinary URL
+            media.push({
+              type: fileType,
+              url: result.secure_url,
+              cloudinaryId: result.public_id
+            });
+            
+            console.log(`Uploaded media to Cloudinary: ${result.secure_url}`);
+          } catch (err) {
+            console.error('Cloudinary upload failed:', err);
+            // Fall back to local storage if Cloudinary fails
+            media.push({
+              type: fileType,
+              url: `/uploads/${file.filename}`
+            });
+            console.log(`Falling back to local storage: /uploads/${file.filename}`);
+          }
         }
       }
 
@@ -386,6 +446,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(comments);
     } catch (error) {
       res.status(400).send((error as Error).message);
+    }
+  });
+
+  // File verification and repair routes
+  app.post("/api/admin/verify-files", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      // Start file verification process
+      const results = await runFullVerification();
+      res.json(results);
+    } catch (error) {
+      console.error("Error during file verification:", error);
+      res.status(500).json({
+        error: "File verification failed",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/admin/verify-user-photos", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      // Verify and repair user photos only
+      const results = await verifyAndRepairUserPhotos();
+      res.json(results);
+    } catch (error) {
+      console.error("Error verifying user photos:", error);
+      res.status(500).json({
+        error: "User photo verification failed",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/admin/verify-post-media", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      // Verify and repair post media only
+      const results = await verifyAndRepairPostMedia();
+      res.json(results);
+    } catch (error) {
+      console.error("Error verifying post media:", error);
+      res.status(500).json({
+        error: "Post media verification failed",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.get("/api/files/check", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const filePath = req.query.path?.toString();
+    if (!filePath) {
+      return res.status(400).json({ error: "File path is required" });
+    }
+    
+    try {
+      const result = await checkFileExists(filePath);
+      res.json(result);
+    } catch (error) {
+      console.error("Error checking file:", error);
+      res.status(500).json({
+        error: "File check failed",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   });
 

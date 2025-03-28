@@ -25,7 +25,7 @@ export default function HomePage() {
     queryKey: [`/api/users/${user?.id}/following`],
   });
 
-  const { data: requests, isLoading: isRequestsLoading } = useQuery({
+  const { data: requests, isLoading: isRequestsLoading } = useQuery<any[]>({
     queryKey: [`/api/users/${user?.id}/requests`],
     enabled: !!user?.id,
   });
@@ -73,6 +73,11 @@ export default function HomePage() {
             <Link href="/profile">
               <Button variant="ghost" size="icon">
                 <UserIcon className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Link href="/admin">
+              <Button variant="ghost" className="text-sm">
+                Admin
               </Button>
             </Link>
             <Button
