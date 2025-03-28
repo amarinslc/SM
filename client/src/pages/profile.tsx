@@ -4,12 +4,14 @@ import { User, Post } from "@shared/schema";
 import { ProfileEditor } from "@/components/profile-editor";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Pencil, Home, Loader2 } from "lucide-react";
+import { Pencil, Home, Loader2, UserCheck, UserX } from "lucide-react";
 import { useParams, Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { PostCard } from "@/components/post-card";
 import { UserListDrawer } from "@/components/user-list-drawer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PendingRequests } from "@/components/pending-requests";
+import { Badge } from "@/components/ui/badge";
 
 type ListType = "followers" | "following" | null;
 
@@ -112,6 +114,14 @@ export function ProfilePage() {
 
   const isOwnProfile = !id || (currentUser && currentUser.id === parseInt(id));
 
+  // Fetch pending requests if this is the user's own profile
+  const { data: pendingRequests, isLoading: isPendingRequestsLoading } = useQuery<any[]>({
+    queryKey: [`/api/users/requests`],
+    enabled: isOwnProfile && !!currentUser?.id ? true : false,
+  });
+
+  const hasPendingRequests = isOwnProfile && pendingRequests && Array.isArray(pendingRequests) && pendingRequests.length > 0;
+
   return (
     <div className="container mx-auto py-6 px-4">
       <div className="flex justify-between items-center mb-6">
@@ -134,6 +144,20 @@ export function ProfilePage() {
           </>
         ) : (
           <ProfileView user={user} onEdit={isOwnProfile ? () => setIsEditing(true) : undefined} isOwnProfile={!!isOwnProfile} />
+        )}
+
+        {hasPendingRequests && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold flex items-center">
+                  Pending Follow Requests
+                  <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>
+                </h2>
+              </div>
+              <PendingRequests requests={pendingRequests} />
+            </CardContent>
+          </Card>
         )}
 
         <div className="mt-8">

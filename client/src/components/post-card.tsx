@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Post, User, Comment } from "@shared/schema";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInHours, format } from "date-fns";
 import { CommentView } from "./comment";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -95,7 +95,9 @@ export function PostCard({ post }: PostCardProps) {
             <a className="font-semibold hover:underline">{author.name}</a>
           </Link>
           <span className="text-sm text-muted-foreground">
-            {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true })}
+            {differenceInHours(new Date(), new Date(post.createdAt || new Date())) < 24 
+              ? formatDistanceToNow(new Date(post.createdAt || new Date()), { addSuffix: true })
+              : format(new Date(post.createdAt || new Date()), 'MMMM d, yyyy')}
           </span>
         </div>
         {currentUser?.id === author.id && (

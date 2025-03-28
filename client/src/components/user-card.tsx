@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { Link } from "wouter";
 
 interface UserCardProps {
   user: User;
@@ -17,12 +18,13 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
-  const { data: followRequests } = useQuery({
-    queryKey: [`/api/users/${currentUser?.id}/requests`],
+  const { data: followRequests } = useQuery<any[]>({
+    queryKey: [`/api/users/requests`],
     enabled: !!currentUser?.id,
   });
 
-  const hasPendingRequest = followRequests?.some((request) => request.follower.id === user.id) ?? false;
+  const hasPendingRequest = Array.isArray(followRequests) && 
+    followRequests.some((request: any) => request.follower.id === user.id) || false;
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -37,7 +39,7 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       // Also invalidate requests query to handle pending state
-      queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser?.id}/requests`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/users/requests`] });
 
       toast({
         title: isFollowing ? "Unfollowed" : data?.message ?? "Following",
@@ -62,13 +64,19 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   return (
     <Card>
       <CardHeader className="flex-row items-center gap-4">
-        <Avatar className="h-12 w-12">
-          <AvatarImage src={user.photo || undefined} />
-          <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
-        </Avatar>
+        <Link href={`/profile/${user.id}`}>
+          <Avatar className="h-12 w-12 cursor-pointer">
+            <AvatarImage src={user.photo || undefined} />
+            <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+          </Avatar>
+        </Link>
         <div className="flex flex-col">
-          <span className="font-semibold">{user.name}</span>
-          <span className="text-sm text-muted-foreground">@{user.username}</span>
+          <Link href={`/profile/${user.id}`}>
+            <span className="font-semibold hover:underline cursor-pointer">{user.name}</span>
+          </Link>
+          <Link href={`/profile/${user.id}`}>
+            <span className="text-sm text-muted-foreground hover:underline cursor-pointer">@{user.username}</span>
+          </Link>
         </div>
       </CardHeader>
       <CardContent>
