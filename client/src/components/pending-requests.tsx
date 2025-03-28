@@ -24,25 +24,40 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
       await apiRequest("POST", `/api/users/requests/${followerId}/accept`);
     },
     onSuccess: () => {
-      // Use consistent query key pattern for invalidation
       // Invalidate all user queries
       queryClient.invalidateQueries({ 
         queryKey: ["/api/users"],
         refetchType: "all" 
       });
+      
       // Invalidate feed
       queryClient.invalidateQueries({ 
         queryKey: ["/api/feed"],
         refetchType: "all"
       });
-      // Invalidate requests for the current user
+      
+      // Get current user for more targeted invalidation
       const currentUser = queryClient.getQueryData<any>(["/api/user"]);
       if (currentUser?.id) {
+        // Invalidate incoming requests
         queryClient.invalidateQueries({ 
           queryKey: [`/api/users/${currentUser.id}/requests`],
           refetchType: "all"
         });
+        
+        // Invalidate current user's following list
+        queryClient.invalidateQueries({
+          queryKey: [`/api/users/${currentUser.id}/following`],
+          refetchType: "all"
+        });
+        
+        // Invalidate current user data
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/user"],
+          refetchType: "all"
+        });
       }
+      
       toast({ title: "Follow request accepted" });
     },
   });
@@ -52,20 +67,28 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
       await apiRequest("POST", `/api/users/requests/${followerId}/reject`);
     },
     onSuccess: () => {
-      // Use consistent query key pattern for invalidation
       // Invalidate all user queries
       queryClient.invalidateQueries({ 
         queryKey: ["/api/users"],
         refetchType: "all" 
       });
-      // Invalidate requests for the current user
+      
+      // Get current user for more targeted invalidation
       const currentUser = queryClient.getQueryData<any>(["/api/user"]);
       if (currentUser?.id) {
+        // Invalidate incoming requests
         queryClient.invalidateQueries({ 
           queryKey: [`/api/users/${currentUser.id}/requests`],
           refetchType: "all"
         });
+        
+        // Invalidate current user data
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/user"],
+          refetchType: "all"
+        });
       }
+      
       toast({ title: "Follow request rejected" });
     },
   });
@@ -83,8 +106,11 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
             <Link href={`/profile/${request.follower.id}`}>
               <div className="flex items-center gap-2 cursor-pointer">
                 <Avatar>
-                  <AvatarImage src={request.follower.photo || undefined} />
-                  <AvatarFallback>{request.follower.name[0].toUpperCase()}</AvatarFallback>
+                  {request.follower.photo ? (
+                    <AvatarImage src={request.follower.photo} alt={`${request.follower.name}'s profile photo`} />
+                  ) : (
+                    <AvatarFallback>{request.follower.name[0].toUpperCase()}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div>
                   <div className="font-medium">{request.follower.name}</div>

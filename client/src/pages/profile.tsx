@@ -37,8 +37,11 @@ function ProfileView({ user, onEdit, isOwnProfile }: { user: User; onEdit?: () =
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={user.photo || undefined} />
-                <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+                {user.photo ? (
+                  <AvatarImage src={user.photo} alt={`${user.name}'s profile photo`} />
+                ) : (
+                  <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+                )}
               </Avatar>
               <div>
                 <h2 className="text-2xl font-bold">{user.name}</h2>

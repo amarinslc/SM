@@ -28,8 +28,11 @@ export function OutgoingRequests({ requests }: OutgoingRequestsProps) {
             <Link href={`/profile/${request.following.id}`}>
               <div className="flex items-center gap-2 cursor-pointer">
                 <Avatar>
-                  <AvatarImage src={request.following.photo || undefined} />
-                  <AvatarFallback>{request.following.name[0].toUpperCase()}</AvatarFallback>
+                  {request.following.photo ? (
+                    <AvatarImage src={request.following.photo} alt={`${request.following.name}'s profile photo`} />
+                  ) : (
+                    <AvatarFallback>{request.following.name[0].toUpperCase()}</AvatarFallback>
+                  )}
                 </Avatar>
                 <div>
                   <div className="font-medium">{request.following.name}</div>

@@ -39,15 +39,36 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       return isFollowing ? undefined : response.json();
     },
     onSuccess: (data) => {
+      // Invalidate all relevant queries for proper cache updating
       queryClient.invalidateQueries({ queryKey: [`/api/users/${user.id}`] });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/users/${currentUser?.id}/following`],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
-      // Also invalidate requests query to handle pending state
+      
       if (currentUser?.id) {
-        queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser.id}/requests`] });
+        // Invalidate current user's following list
+        queryClient.invalidateQueries({
+          queryKey: [`/api/users/${currentUser.id}/following`],
+        });
+        
+        // Invalidate current user's followers list
+        queryClient.invalidateQueries({
+          queryKey: [`/api/users/${currentUser.id}/followers`],
+        });
+        
+        // Invalidate requests (both incoming and outgoing)
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/users/${currentUser.id}/requests`],
+        });
+        
+        // Invalidate outgoing requests
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/users/${currentUser.id}/outgoing-requests`],
+        });
+        
+        // Also invalidate the current user data
+        queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       }
+      
+      // Always invalidate feed
+      queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
 
       toast({
         title: isFollowing ? "Unfollowed" : data?.message ?? "Following",
@@ -74,8 +95,11 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       <CardHeader className="flex-row items-center gap-4">
         <Link href={`/profile/${user.id}`}>
           <Avatar className="h-12 w-12 cursor-pointer">
-            <AvatarImage src={user.photo || undefined} />
-            <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+            {user.photo ? (
+              <AvatarImage src={user.photo} alt={`${user.name}'s profile photo`} />
+            ) : (
+              <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>
+            )}
           </Avatar>
         </Link>
         <div className="flex flex-col">
