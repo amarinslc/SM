@@ -17,6 +17,7 @@ import {
   verifyAndRepairUserPhotos, 
   verifyAndRepairPostMedia 
 } from './file-verification';
+import { isAdmin } from './middlewares/admin-check';
 
 // Use Replit's persistent .data folder for file storage
 const uploadsDir = path.join(process.cwd(), '.data', 'uploads');
@@ -449,10 +450,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // File verification and repair routes
-  app.post("/api/admin/verify-files", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  // Admin user management
+  // Special bootstrap endpoint to create the first admin user
+  // This endpoint requires a secret key for security
+  app.post("/api/bootstrap/admin/:username", async (req, res) => {
+    // Check for secret key in request body
+    const { secret } = req.body;
     
+    // This should match an environment variable or a predefined secure value
+    // For simplicity, we're using a hardcoded secret in this example
+    // In production, use process.env.ADMIN_BOOTSTRAP_SECRET
+    const ADMIN_BOOTSTRAP_SECRET = "dunbar_admin_bootstrap_2025";
+    
+    if (secret !== ADMIN_BOOTSTRAP_SECRET) {
+      return res.status(403).json({ error: "Invalid bootstrap secret" });
+    }
+    
+    try {
+      const username = req.params.username;
+      
+      // Find the user by username
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update the user's role to admin
+      const updatedUser = await storage.updateUser(user.id, { role: "admin" });
+      
+      res.json({
+        message: `User ${username} has been bootstrapped as the first admin`,
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error bootstrapping admin:", error);
+      res.status(500).json({
+        error: "Failed to bootstrap admin user",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  app.post("/api/admin/promote/:username", isAdmin, async (req, res) => {
+    try {
+      const username = req.params.username;
+      
+      // Find the user by username
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update the user's role to admin
+      const updatedUser = await storage.updateUser(user.id, { role: "admin" });
+      
+      res.json({
+        message: `User ${username} has been promoted to admin`,
+        user: updatedUser
+      });
+    } catch (error) {
+      console.error("Error promoting user to admin:", error);
+      res.status(500).json({
+        error: "Failed to promote user",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // File verification and repair routes
+  app.post("/api/admin/verify-files", isAdmin, async (req, res) => {
     try {
       // Start file verification process
       const results = await runFullVerification();
@@ -466,9 +532,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/admin/verify-user-photos", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
+  app.post("/api/admin/verify-user-photos", isAdmin, async (req, res) => {
     try {
       // Verify and repair user photos only
       const results = await verifyAndRepairUserPhotos();
@@ -482,9 +546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post("/api/admin/verify-post-media", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
+  app.post("/api/admin/verify-post-media", isAdmin, async (req, res) => {
     try {
       // Verify and repair post media only
       const results = await verifyAndRepairPostMedia();
@@ -498,9 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get("/api/files/check", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
+  app.get("/api/files/check", isAdmin, async (req, res) => {
     const filePath = req.query.path?.toString();
     if (!filePath) {
       return res.status(400).json({ error: "File path is required" });

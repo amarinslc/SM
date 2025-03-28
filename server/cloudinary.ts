@@ -3,11 +3,21 @@ import fs from 'fs';
 import { promisify } from 'util';
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+// First try using CLOUDINARY_URL if available (preferred)
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config({
+    cloud_name: 'dunbar', // Hardcode correct cloud name
+  });
+  console.log('Configured Cloudinary using CLOUDINARY_URL');
+} else {
+  // Fall back to individual environment variables if needed
+  cloudinary.config({
+    cloud_name: 'dunbar', // Hardcode correct cloud name
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  console.log('Configured Cloudinary using individual credential variables');
+}
 
 // Promisify fs methods
 const unlinkAsync = promisify(fs.unlink);

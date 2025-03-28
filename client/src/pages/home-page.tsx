@@ -75,11 +75,13 @@ export default function HomePage() {
                 <UserIcon className="h-5 w-5" />
               </Button>
             </Link>
-            <Link href="/admin">
-              <Button variant="ghost" className="text-sm">
-                Admin
-              </Button>
-            </Link>
+            {user.role === 'admin' && (
+              <Link href="/admin">
+                <Button variant="ghost" className="text-sm">
+                  Admin
+                </Button>
+              </Link>
+            )}
             <Button
               variant="ghost"
               size="icon"

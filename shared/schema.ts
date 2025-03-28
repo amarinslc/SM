@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   verificationToken: text("verification_token"),
   resetPasswordToken: text("reset_password_token"),
   resetPasswordExpires: timestamp("reset_password_expires"),
+  role: text("role").default("user"), // Available roles: "user", "admin"
 });
 
 export const follows = pgTable("follows", {

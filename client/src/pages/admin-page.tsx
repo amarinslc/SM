@@ -20,6 +20,26 @@ export default function AdminPage() {
   if (!user) {
     return <Redirect to="/auth" />;
   }
+  
+  // Check if user has admin role
+  if (user.role !== 'admin') {
+    return (
+      <div className="container mx-auto py-10">
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              You do not have permission to access the admin area.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4">This area is restricted to administrators only.</p>
+            <Button onClick={() => window.history.back()}>Go Back</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const verifyAllFiles = async () => {
     setIsVerifyingAll(true);
@@ -96,11 +116,109 @@ export default function AdminPage() {
     }
   };
 
+  // State for user management
+  const [usernameToPromote, setUsernameToPromote] = useState('');
+  const [isPromoting, setIsPromoting] = useState(false);
+
+  const promoteUser = async () => {
+    if (!usernameToPromote.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a username",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPromoting(true);
+    try {
+      const response = await apiRequest("POST", `/api/admin/promote/${usernameToPromote}`);
+      const result = await response.json();
+      
+      toast({
+        title: "User Promoted",
+        description: result.message,
+      });
+      
+      // Clear the input field
+      setUsernameToPromote('');
+    } catch (error) {
+      console.error("Error promoting user:", error);
+      toast({
+        title: "Promotion Failed",
+        description: error instanceof Error ? error.message : "An error occurred while promoting the user",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
   return (
     <div className="container mx-auto py-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>User Management</CardTitle>
+            <CardDescription>
+              Promote users to administrator role
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="text" 
+                  value={usernameToPromote}
+                  onChange={(e) => setUsernameToPromote(e.target.value)}
+                  placeholder="Enter username to promote"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                />
+                <Button 
+                  onClick={promoteUser} 
+                  disabled={isPromoting || !usernameToPromote.trim()}
+                >
+                  {isPromoting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Promoting...
+                    </>
+                  ) : (
+                    "Promote to Admin"
+                  )}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                This will grant administrator privileges to the specified user.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-1">
+          <CardHeader>
+            <CardTitle>Current Admin</CardTitle>
+            <CardDescription>
+              Your administrator profile
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold">{user.username.charAt(0).toUpperCase()}</span>
+              </div>
+              <div>
+                <p className="font-medium">{user.username}</p>
+                <p className="text-sm text-muted-foreground">Role: {user.role}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card className="mb-8">
         <CardHeader>
-          <CardTitle>Admin Tools</CardTitle>
+          <CardTitle>File Verification Tools</CardTitle>
           <CardDescription>
             Verify and repair file references in the database
           </CardDescription>
