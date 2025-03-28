@@ -17,6 +17,9 @@ try {
   await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
 }
 
+// Serve static files from the uploads directory
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
 // Add request logging
 app.use((req, res, next) => {
   const start = Date.now();
