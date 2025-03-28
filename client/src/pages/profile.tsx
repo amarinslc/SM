@@ -90,7 +90,14 @@ export function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const { id } = useParams<{ id: string }>();
   const { user: currentUser } = useAuth();
-
+  
+  // Calculate isOwnProfile early, before using it in hooks
+  // Make sure we're parsing a valid integer ID
+  const isValidId = id && !isNaN(parseInt(id));
+  const parsedId = isValidId ? parseInt(id) : 0;
+  const isOwnProfileCalculated = !isValidId || (currentUser && currentUser.id === parsedId);
+  
+  // All React Query hooks must be called unconditionally at the top level
   const { data: user, isLoading: isUserLoading } = useQuery<User>({
     queryKey: id ? [`/api/users/${id}`] : ["/api/user"],
   });
@@ -99,7 +106,14 @@ export function ProfilePage() {
     queryKey: [`/api/posts/${id || currentUser?.id}`],
     enabled: !!user,
   });
-
+  
+  // Always call this hook, but conditionally based on whether this is the current user's profile
+  const { data: pendingRequests, isLoading: isPendingRequestsLoading } = useQuery<any[]>({
+    queryKey: [`/api/users/${currentUser?.id || 0}/requests`],
+    enabled: !!currentUser?.id && isOwnProfileCalculated === true,
+  });
+  
+  // Handle loading state
   if (isUserLoading || isPostsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -108,18 +122,14 @@ export function ProfilePage() {
     );
   }
 
+  // Handle no user found
   if (!user) {
     return <div>User not found</div>;
   }
 
-  const isOwnProfile = !id || (currentUser && currentUser.id === parseInt(id));
-
-  // Fetch pending requests if this is the user's own profile
-  const { data: pendingRequests, isLoading: isPendingRequestsLoading } = useQuery<any[]>({
-    queryKey: [`/api/users/requests`],
-    enabled: isOwnProfile && !!currentUser?.id ? true : false,
-  });
-
+  // For any non-hook calculations, we can use these after the conditional returns
+  // Use the safe version we calculated earlier
+  const isOwnProfile = isOwnProfileCalculated;
   const hasPendingRequests = isOwnProfile && pendingRequests && Array.isArray(pendingRequests) && pendingRequests.length > 0;
 
   return (

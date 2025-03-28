@@ -25,18 +25,24 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
     },
     onSuccess: () => {
       // Use consistent query key pattern for invalidation
+      // Invalidate all user queries
       queryClient.invalidateQueries({ 
         queryKey: ["/api/users"],
         refetchType: "all" 
       });
+      // Invalidate feed
       queryClient.invalidateQueries({ 
         queryKey: ["/api/feed"],
         refetchType: "all"
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/users", "requests"],
-        refetchType: "all"
-      });
+      // Invalidate requests for the current user
+      const currentUser = queryClient.getQueryData<any>(["/api/user"]);
+      if (currentUser?.id) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/users/${currentUser.id}/requests`],
+          refetchType: "all"
+        });
+      }
       toast({ title: "Follow request accepted" });
     },
   });
@@ -47,14 +53,19 @@ export function PendingRequests({ requests }: PendingRequestsProps) {
     },
     onSuccess: () => {
       // Use consistent query key pattern for invalidation
+      // Invalidate all user queries
       queryClient.invalidateQueries({ 
         queryKey: ["/api/users"],
-        refetchType: "all"
+        refetchType: "all" 
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/users", "requests"],
-        refetchType: "all"
-      });
+      // Invalidate requests for the current user
+      const currentUser = queryClient.getQueryData<any>(["/api/user"]);
+      if (currentUser?.id) {
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/users/${currentUser.id}/requests`],
+          refetchType: "all"
+        });
+      }
       toast({ title: "Follow request rejected" });
     },
   });

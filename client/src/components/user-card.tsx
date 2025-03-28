@@ -18,13 +18,19 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
 
+  // Fetch follow requests for the current user
   const { data: followRequests } = useQuery<any[]>({
-    queryKey: [`/api/users/requests`],
-    enabled: !!currentUser?.id,
+    queryKey: currentUser?.id ? [`/api/users/${currentUser.id}/requests`] : [],
+    enabled: !!currentUser?.id, 
   });
 
-  const hasPendingRequest = Array.isArray(followRequests) && 
-    followRequests.some((request: any) => request.follower.id === user.id) || false;
+  // Safely check if there's a pending request from this user
+  const hasPendingRequest = !!(
+    Array.isArray(followRequests) && 
+    followRequests.some((request: any) => 
+      request && request.follower && request.follower.id === user.id
+    )
+  );
 
   const followMutation = useMutation({
     mutationFn: async () => {
@@ -39,7 +45,9 @@ export function UserCard({ user, isFollowing }: UserCardProps) {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
       // Also invalidate requests query to handle pending state
-      queryClient.invalidateQueries({ queryKey: [`/api/users/requests`] });
+      if (currentUser?.id) {
+        queryClient.invalidateQueries({ queryKey: [`/api/users/${currentUser.id}/requests`] });
+      }
 
       toast({
         title: isFollowing ? "Unfollowed" : data?.message ?? "Following",
