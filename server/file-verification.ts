@@ -101,7 +101,7 @@ export async function verifyAndRepairUserPhotos(): Promise<{
         
         // Upload to Cloudinary
         const result = await uploadToCloudinary(fileCheck.path, {
-          folder: 'dunbar/users',
+          folder: 'dgrs48tas/users',
         });
         
         // Update the user record with the Cloudinary URL
@@ -192,7 +192,7 @@ export async function verifyAndRepairPostMedia(): Promise<{
           
           // Upload to Cloudinary
           const result = await uploadToCloudinary(fileCheck.path, {
-            folder: 'dunbar/posts',
+            folder: 'dgrs48tas/posts',
             resource_type: mediaItem.type === 'video' ? 'video' : 'image',
           });
           
