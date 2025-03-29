@@ -15,6 +15,12 @@ if (process.env.CLOUDINARY_URL) {
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
+  
+  // Force cloud_name to always be dgrs48tas, overriding potential misconfiguration
+  if (cloudinary.config().cloud_name !== 'dgrs48tas') {
+    cloudinary.config({ cloud_name: 'dgrs48tas' });
+    console.log('Overrode cloud_name to ensure correct Cloudinary configuration');
+  }
   console.log('Configured Cloudinary using individual credential variables');
 }
 
@@ -34,6 +40,64 @@ export interface CloudinaryUploadResult {
   public_id: string;
   format: string;
   resource_type: string;
+}
+
+/**
+ * Check if Cloudinary is properly configured
+ * Returns a health status object with details on configuration
+ */
+export async function checkCloudinaryHealth(): Promise<{
+  configured: boolean;
+  status: string;
+  details: {
+    cloud_name: string | undefined;
+    api_key_configured: boolean;
+    api_secret_configured: boolean;
+  };
+}> {
+  const cloud_name = cloudinary.config().cloud_name;
+  const api_key_configured = !!cloudinary.config().api_key;
+  const api_secret_configured = !!cloudinary.config().api_secret;
+  
+  // Check if the service is properly configured
+  const configured = !!cloud_name && api_key_configured && api_secret_configured;
+  
+  // Do a lightweight ping to verify connectivity
+  if (configured) {
+    try {
+      // Try accessing account info as a connectivity test
+      await cloudinary.api.ping();
+      return {
+        configured,
+        status: 'healthy',
+        details: {
+          cloud_name,
+          api_key_configured,
+          api_secret_configured
+        }
+      };
+    } catch (error) {
+      return {
+        configured,
+        status: 'configured_but_unreachable',
+        details: {
+          cloud_name,
+          api_key_configured,
+          api_secret_configured
+        }
+      };
+    }
+  }
+  
+  return {
+    configured,
+    status: 'not_configured',
+    details: {
+      cloud_name,
+      api_key_configured,
+      api_secret_configured
+    }
+  };
 }
 
 /**

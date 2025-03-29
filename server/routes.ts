@@ -10,7 +10,7 @@ import express from 'express';
 import { hashPassword } from './auth';
 import { db } from './db';
 import { and, eq } from 'drizzle-orm';
-import { uploadToCloudinary } from './cloudinary';
+import { uploadToCloudinary, checkCloudinaryHealth } from './cloudinary';
 import { 
   checkFileExists, 
   runFullVerification, 
@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Handle photo upload - now with Cloudinary
+      // Handle photo upload - strict Cloudinary-only approach
       if (req.file) {
         try {
           // Upload to Cloudinary
@@ -144,9 +144,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Uploaded user photo to Cloudinary: ${result.secure_url}`);
         } catch (err) {
           console.error('Cloudinary upload failed:', err);
-          // Fall back to local storage if Cloudinary fails
-          updateData.photo = `/uploads/${req.file.filename}`;
-          console.log(`Falling back to local storage: ${updateData.photo}`);
+          // No fallback - return error to client
+          return res.status(500).json({ 
+            error: "Failed to upload profile photo. Please try again later." 
+          });
         }
       }
 
@@ -311,9 +312,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`Uploaded user photo to Cloudinary: ${photoPath}`);
         } catch (err) {
           console.error('Cloudinary upload failed during registration:', err);
-          // Fall back to local storage if Cloudinary fails
-          photoPath = `/uploads/${req.file.filename}`;
-          console.log(`Falling back to local storage: ${photoPath}`);
+          // No fallback - return error to client
+          return res.status(500).json({ 
+            error: "Failed to upload profile photo. Please try registration again later." 
+          });
         }
       }
 
@@ -371,12 +373,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Uploaded media to Cloudinary: ${result.secure_url}`);
           } catch (err) {
             console.error('Cloudinary upload failed:', err);
-            // Fall back to local storage if Cloudinary fails
-            media.push({
-              type: fileType,
-              url: `/uploads/${file.filename}`
+            // No fallback - return error to client for the entire upload
+            return res.status(500).json({ 
+              error: "Failed to upload media. Please try creating your post again later." 
             });
-            console.log(`Falling back to local storage: /uploads/${file.filename}`);
           }
         }
       }
@@ -632,6 +632,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add a health check endpoint for Cloudinary
+  app.get("/api/storage/health", async (req, res) => {
+    try {
+      const healthStatus = await checkCloudinaryHealth();
+      res.json(healthStatus);
+    } catch (error) {
+      console.error("Error checking Cloudinary health:", error);
+      res.status(500).json({
+        configured: false,
+        status: 'error',
+        details: {
+          error: error instanceof Error ? error.message : "Unknown error"
+        }
+      });
+    }
+  });
+  
   // Serve uploaded files from both locations during transition
   // First try the persistent storage
   app.use('/uploads', express.static(path.join(process.cwd(), '.data', 'uploads')));
