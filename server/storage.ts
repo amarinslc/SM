@@ -623,7 +623,7 @@ export class DatabaseStorage implements IStorage {
       console.log(`Generated reset link: ${resetLink}`);
 
       const emailResponse = await resend.emails.send({
-        from: 'Dunbar <noreply@dunbar.social>',
+        from: 'Dunbar <noreply@dgrs48tas.social>',
         to: email,
         subject: 'Reset your password',
         html: `

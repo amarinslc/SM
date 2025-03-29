@@ -135,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Upload to Cloudinary
           const result = await uploadToCloudinary(req.file.path, {
-            folder: 'dunbar/users',
+            folder: 'dgrs48tas/users',
           });
           
           // Use the Cloudinary secure URL for the photo
@@ -302,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Upload to Cloudinary
           const result = await uploadToCloudinary(req.file.path, {
-            folder: 'dunbar/users',
+            folder: 'dgrs48tas/users',
           });
           
           // Use the Cloudinary secure URL for the photo
@@ -357,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             // Upload to Cloudinary
             const result = await uploadToCloudinary(file.path, {
-              folder: 'dunbar/posts',
+              folder: 'dgrs48tas/posts',
               resource_type: fileType === 'video' ? 'video' : 'image'
             });
             
