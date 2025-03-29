@@ -3,16 +3,18 @@ import path from 'path';
 import { promisify } from 'util';
 import { db } from './db';
 import { users, posts } from '@shared/schema';
-import { eq, gt } from 'drizzle-orm';
-import { uploadToCloudinary } from './cloudinary';
+import { eq, gt, sql } from 'drizzle-orm';
+import { uploadToCloudinary, extractPublicIdFromUrl } from './cloudinary';
 
 // Promisify fs methods
 const existsAsync = promisify(fs.exists);
 const readFileAsync = promisify(fs.readFile);
+const fsAccess = promisify(fs.access);
 
-// Paths for local storage
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-const DATA_UPLOADS_DIR = path.join(process.cwd(), '.data', 'uploads');
+// Paths for local storage - primary is always the persistent one
+const DATA_DIR = path.join(process.cwd(), '.data');
+const DATA_UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads'); // Legacy path
 
 /**
  * Check if a file exists in either the uploads directory or the .data/uploads directory

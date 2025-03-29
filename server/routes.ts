@@ -12,47 +12,77 @@ import { db } from './db';
 import { and, eq } from 'drizzle-orm';
 import { uploadToCloudinary, checkCloudinaryHealth } from './cloudinary';
 import { 
-  checkFileExists, 
-  runFullVerification, 
+  checkFileExists,
   verifyAndRepairUserPhotos, 
-  verifyAndRepairPostMedia 
+  verifyAndRepairPostMedia,
+  runFullVerification
 } from './file-verification';
 import { isAdmin } from './middlewares/admin-check';
 
-// Use Replit's persistent .data folder for file storage
-const uploadsDir = path.join(process.cwd(), '.data', 'uploads');
+// Use ONLY Replit's persistent .data folder for file storage
+// This is critical for file persistence across deployments
+const DATA_DIR = path.join(process.cwd(), '.data');
+const uploadsDir = path.join(DATA_DIR, 'uploads');
+
 try {
   await fs.access(uploadsDir);
 } catch {
   // Create the .data directory first if it doesn't exist
   try {
-    await fs.access(path.join(process.cwd(), '.data'));
+    await fs.access(DATA_DIR);
   } catch {
-    await fs.mkdir(path.join(process.cwd(), '.data'), { recursive: true, mode: 0o755 });
+    console.log('Creating persistent .data directory');
+    await fs.mkdir(DATA_DIR, { recursive: true, mode: 0o755 });
   }
+  console.log('Creating persistent uploads directory at', uploadsDir);
   await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
+}
+
+// Ensure the temp directory exists in .data for temporary files
+const tempDir = path.join(DATA_DIR, 'temp');
+try {
+  await fs.access(tempDir);
+} catch {
+  console.log('Creating persistent temp directory at', tempDir);
+  await fs.mkdir(tempDir, { recursive: true, mode: 0o755 });
 }
 
 const upload = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => {
-      // Ensure the destination exists
+      // Always use the persistent .data/uploads directory
+      // This is critical for file persistence across deployments
       fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 })
-        .then(() => cb(null, uploadsDir))
+        .then(() => {
+          console.log('Uploading to persistent directory:', uploadsDir);
+          cb(null, uploadsDir);
+        })
         .catch(err => {
-          console.error('Error creating uploads directory:', err);
-          cb(err, '');
+          console.error('Error using persistent uploads directory:', err);
+          // Try fallback to temp directory as last resort
+          fs.mkdir(tempDir, { recursive: true, mode: 0o755 })
+            .then(() => {
+              console.warn('Using fallback temp directory for upload');
+              cb(null, tempDir);
+            })
+            .catch(tempErr => {
+              console.error('Critical error - both upload directories unavailable:', tempErr);
+              cb(tempErr, '');
+            });
         });
     },
     filename: (_req, file, cb) => {
-      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
-      cb(null, `${uniqueSuffix}-${file.originalname}`);
+      // Make filenames more unique with timestamp and random string
+      const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+      const sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      cb(null, `${uniqueSuffix}-${sanitizedFilename}`);
     },
   }),
   limits: {
-    fileSize: 50 * 1024 * 1024,
+    fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (_req, file, cb) => {
+    // Only accept image and video files
     if (!file.originalname.match(/\.(jpg|jpeg|png|gif|mp4|webm|mov)$/i)) {
       return cb(new Error('Only image and video files are allowed!'));
     }
@@ -635,8 +665,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Add a health check endpoint for Cloudinary
   app.get("/api/storage/health", async (req, res) => {
     try {
-      const healthStatus = await checkCloudinaryHealth();
-      res.json(healthStatus);
+      const cloudinaryStatus = await checkCloudinaryHealth();
+
+      // Also check persistent directory health
+      const persistentStatus = {
+        dataDir: false,
+        uploadsDir: false,
+        tempDir: false,
+        accessRights: false
+      };
+
+      try {
+        // Check .data directory
+        await fs.access(DATA_DIR);
+        persistentStatus.dataDir = true;
+
+        // Check uploads directory
+        await fs.access(uploadsDir);
+        persistentStatus.uploadsDir = true;
+
+        // Check temp directory
+        await fs.access(tempDir);
+        persistentStatus.tempDir = true;
+
+        // Check write permissions by creating a test file
+        const testFile = path.join(uploadsDir, `.test-${Date.now()}.txt`);
+        await fs.writeFile(testFile, 'test', { encoding: 'utf8' });
+        await fs.unlink(testFile);
+        persistentStatus.accessRights = true;
+      } catch (err) {
+        console.error('Error checking persistent directories:', err);
+      }
+
+      res.json({
+        ...cloudinaryStatus,
+        persistentStorage: {
+          status: Object.values(persistentStatus).every(v => v) ? 'healthy' : 'issues',
+          details: persistentStatus
+        }
+      });
     } catch (error) {
       console.error("Error checking Cloudinary health:", error);
       res.status(500).json({
@@ -649,12 +716,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Serve uploaded files from both locations during transition
-  // First try the persistent storage
-  app.use('/uploads', express.static(path.join(process.cwd(), '.data', 'uploads')));
+  // Admin-only endpoint to automatically fix storage issues
+  app.post("/api/storage/repair", isAdmin, async (req, res) => {
+    try {
+      console.log("Starting storage repair process...");
+      
+      // Step 1: Ensure persistent directories exist
+      try {
+        await fs.access(DATA_DIR);
+      } catch {
+        await fs.mkdir(DATA_DIR, { recursive: true, mode: 0o755 });
+        console.log("Created .data directory");
+      }
+      
+      try {
+        await fs.access(uploadsDir);
+      } catch {
+        await fs.mkdir(uploadsDir, { recursive: true, mode: 0o755 });
+        console.log("Created uploads directory");
+      }
+      
+      try {
+        await fs.access(tempDir);
+      } catch {
+        await fs.mkdir(tempDir, { recursive: true, mode: 0o755 });
+        console.log("Created temp directory");
+      }
+      
+      // Step 2: Run the file verification process
+      const verificationResults = await runFullVerification();
+
+      // Step 3: Update health status
+      const healthFile = path.join(DATA_DIR, 'health', 'storage_health.json');
+      try {
+        await fs.mkdir(path.join(DATA_DIR, 'health'), { recursive: true });
+        await fs.writeFile(
+          healthFile, 
+          JSON.stringify({
+            lastCheck: new Date().toISOString(),
+            status: "healthy",
+            verificationResults
+          }), 
+          { encoding: 'utf8' }
+        );
+      } catch (err) {
+        console.error("Failed to write health status:", err);
+      }
+      
+      res.json({
+        status: "success",
+        message: "Storage repair completed successfully",
+        results: verificationResults
+      });
+    } catch (error) {
+      console.error("Error repairing storage:", error);
+      res.status(500).json({
+        status: "error",
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+    }
+  });
   
-  // Then try the old location as fallback for existing files
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  // Serve uploaded files ONLY from the persistent .data directory
+  // This ensures consistent file access across deployments
+  const persistentUploadsPath = path.join(process.cwd(), '.data', 'uploads');
+  
+  // Create a middleware to log file access attempts
+  app.use('/uploads', (req, res, next) => {
+    const requestedFile = req.path;
+    console.log(`File access attempt: ${requestedFile}`);
+    
+    // Check if file exists in persistent storage
+    const fullPath = path.join(persistentUploadsPath, requestedFile);
+    fs.access(fullPath)
+      .then(() => {
+        console.log(`Serving file from persistent storage: ${fullPath}`);
+        next();
+      })
+      .catch(() => {
+        console.warn(`File not found in persistent storage: ${fullPath}`);
+        // If we're here, we'll continue to the static middleware which will return 404
+        next();
+      });
+  });
+  
+  // Only serve files from the persistent storage
+  app.use('/uploads', express.static(persistentUploadsPath));
 
   const httpServer = createServer(app);
   return httpServer;
