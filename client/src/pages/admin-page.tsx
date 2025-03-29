@@ -74,8 +74,17 @@ export default function AdminPage() {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: number) => {
-      const response = await apiRequest("DELETE", `/api/admin/users/${userId}`);
-      return response.json();
+      try {
+        const response = await apiRequest("DELETE", `/api/admin/users/${userId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`${response.status}: ${JSON.stringify(errorData)}`);
+        }
+        return response.json();
+      } catch (error) {
+        console.error("Error deleting user:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       // Close the dialog

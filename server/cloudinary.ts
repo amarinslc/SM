@@ -6,13 +6,13 @@ import { promisify } from 'util';
 // First try using CLOUDINARY_URL if available (preferred)
 if (process.env.CLOUDINARY_URL) {
   cloudinary.config({
-    cloud_name: 'dunbar', // Hardcode correct cloud name
+    cloud_name: 'dgrs48tas', // Correct cloud name
   });
   console.log('Configured Cloudinary using CLOUDINARY_URL');
 } else {
   // Fall back to individual environment variables if needed
   cloudinary.config({
-    cloud_name: 'dunbar', // Hardcode correct cloud name
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dgrs48tas', // Use environment variable with fallback
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
   });
@@ -51,7 +51,7 @@ export async function uploadToCloudinary(
   try {
     // Set default options
     const uploadOptions = {
-      folder: options.folder || 'dunbar',
+      folder: options.folder || 'dgrs48tas',
       resource_type: options.resource_type || 'auto',
       use_filename: true,
       unique_filename: true,
@@ -116,8 +116,8 @@ export function extractPublicIdFromUrl(url: string): string | null {
   // Check if it's a Cloudinary URL
   if (!url.includes('cloudinary.com')) return null;
   
-  // Example URL: https://res.cloudinary.com/cloud-name/image/upload/v1234567890/dunbar/filename.jpg
-  // We want to extract: dunbar/filename
+  // Example URL: https://res.cloudinary.com/dgrs48tas/image/upload/v1234567890/dgrs48tas/filename.jpg
+  // We want to extract: dgrs48tas/filename
   
   try {
     const parts = url.split('/');
