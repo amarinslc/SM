@@ -109,6 +109,20 @@ export async function verifyAndRepairUserPhotos(): Promise<{
         if (!fileCheck.exists || !fileCheck.path) {
           console.log(`Missing user photo: ${user.photo} for user ${user.username}`);
           stats.missing++;
+          
+          try {
+            // Clear the broken photo reference
+            await db
+              .update(users)
+              .set({ photo: null })
+              .where(eq(users.id, user.id));
+            
+            console.log(`Cleared broken photo reference for user ${user.username}`);
+            stats.repaired++;
+          } catch (error) {
+            console.error(`Failed to clear photo for user ${user.id}:`, error);
+            stats.failed++;
+          }
           continue;
         }
         
@@ -195,11 +209,12 @@ export async function verifyAndRepairPostMedia(): Promise<{
             stats.missingMediaItems++;
             postHasMissingMedia = true;
             
-            // Keep the original reference but mark it as broken
-            updatedMedia.push({
-              ...mediaItem,
-              broken: true,
-            });
+            // Instead of just marking it as broken, we'll clean it up
+            // Remove the media item completely from this post
+            stats.repairedMediaItems++;
+            console.log(`Removed broken media reference for post ${post.id}`);
+            
+            // We don't push anything to updatedMedia, effectively removing this media item
             continue;
           }
           
@@ -222,11 +237,9 @@ export async function verifyAndRepairPostMedia(): Promise<{
           console.error(`Failed to repair media for post ${post.id}:`, error);
           stats.failedMediaItems++;
           
-          // Keep the original reference but mark it as broken
-          updatedMedia.push({
-            ...mediaItem,
-            broken: true,
-          });
+          // Instead of keeping broken references, we'll simply remove them
+          console.log(`Removing failed media reference for post ${post.id}`);
+          // We don't push anything to updatedMedia, effectively removing this media item
         }
       }
       
