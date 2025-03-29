@@ -253,19 +253,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/users/:id/followers", async (req, res) => {
-    const followers = await storage.getFollowers(parseInt(req.params.id));
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const requestedUserId = parseInt(req.params.id);
+    const currentUserId = req.user!.id;
+    
+    // Only allow access to the user's own followers
+    if (requestedUserId !== currentUserId) {
+      return res.status(403).json({ error: "You can only view your own followers" });
+    }
+    
+    const followers = await storage.getFollowers(requestedUserId);
     res.json(followers);
   });
 
   app.get("/api/users/:id/following", async (req, res) => {
-    const following = await storage.getFollowing(parseInt(req.params.id));
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const requestedUserId = parseInt(req.params.id);
+    const currentUserId = req.user!.id;
+    
+    // Only allow access to the user's own following list
+    if (requestedUserId !== currentUserId) {
+      return res.status(403).json({ error: "You can only view your own following list" });
+    }
+    
+    const following = await storage.getFollowing(requestedUserId);
     res.json(following);
   });
 
   app.get("/api/users/:id/requests", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const requestedUserId = parseInt(req.params.id);
+    const currentUserId = req.user!.id;
+    
+    // Only allow access to the user's own requests
+    if (requestedUserId !== currentUserId) {
+      return res.status(403).json({ error: "You can only view your own requests" });
+    }
+    
     try {
-      const requests = await storage.getPendingFollowRequests(parseInt(req.params.id));
+      const requests = await storage.getPendingFollowRequests(requestedUserId);
       res.json(requests);
     } catch (error) {
       console.error("Error getting requests:", error);
@@ -275,8 +304,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get("/api/users/:id/outgoing-requests", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    const requestedUserId = parseInt(req.params.id);
+    const currentUserId = req.user!.id;
+    
+    // Only allow access to the user's own outgoing requests
+    if (requestedUserId !== currentUserId) {
+      return res.status(403).json({ error: "You can only view your own outgoing requests" });
+    }
+    
     try {
-      const requests = await storage.getOutgoingFollowRequests(parseInt(req.params.id));
+      const requests = await storage.getOutgoingFollowRequests(requestedUserId);
       res.json(requests);
     } catch (error) {
       console.error("Error getting outgoing requests:", error);
