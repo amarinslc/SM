@@ -3,13 +3,20 @@ import fs from 'fs';
 import { promisify } from 'util';
 
 // Configure Cloudinary
-// Always set cloud_name to dgrs48tas
-cloudinary.config({
-  cloud_name: 'dgrs48tas', // Always use this cloud name
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-console.log('Configured Cloudinary with cloud_name: dgrs48tas');
+// First try using CLOUDINARY_URL if available (preferred)
+if (process.env.CLOUDINARY_URL) {
+  // When CLOUDINARY_URL exists, let the SDK parse it automatically without overriding
+  cloudinary.config();
+  console.log('Configured Cloudinary using CLOUDINARY_URL');
+} else {
+  // Fall back to individual environment variables if needed
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dgrs48tas',
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+  console.log('Configured Cloudinary using individual credential variables');
+}
 
 // Promisify fs methods
 const unlinkAsync = promisify(fs.unlink);

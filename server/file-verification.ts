@@ -22,21 +22,29 @@ const DATA_UPLOADS_DIR = path.join(process.cwd(), '.data', 'uploads');
  */
 export async function checkFileExists(filePath: string): Promise<{ exists: boolean, path?: string }> {
   if (!filePath || typeof filePath !== 'string') {
+    console.log(`Invalid file path: ${filePath}`);
     return { exists: false };
   }
 
   // Extract the filename from the path
   const filename = path.basename(filePath);
   
+  console.log(`Checking for file: ${filename}`);
+  console.log(`Full path provided: ${filePath}`);
+  
   // Check standard uploads directory
   const standardPath = path.join(UPLOADS_DIR, filename);
+  console.log(`Checking standard path: ${standardPath}`);
   if (await existsAsync(standardPath)) {
+    console.log(`File found at: ${standardPath}`);
     return { exists: true, path: standardPath };
   }
   
   // Check .data/uploads directory
   const dataPath = path.join(DATA_UPLOADS_DIR, filename);
+  console.log(`Checking data path: ${dataPath}`);
   if (await existsAsync(dataPath)) {
+    console.log(`File found at: ${dataPath}`);
     return { exists: true, path: dataPath };
   }
   
@@ -44,17 +52,22 @@ export async function checkFileExists(filePath: string): Promise<{ exists: boole
   if (filePath.startsWith('/uploads/')) {
     const filenameOnly = filePath.replace('/uploads/', '');
     const standardPathAlt = path.join(UPLOADS_DIR, filenameOnly);
+    console.log(`Checking alt standard path: ${standardPathAlt}`);
     
     if (await existsAsync(standardPathAlt)) {
+      console.log(`File found at: ${standardPathAlt}`);
       return { exists: true, path: standardPathAlt };
     }
     
     const dataPathAlt = path.join(DATA_UPLOADS_DIR, filenameOnly);
+    console.log(`Checking alt data path: ${dataPathAlt}`);
     if (await existsAsync(dataPathAlt)) {
+      console.log(`File found at: ${dataPathAlt}`);
       return { exists: true, path: dataPathAlt };
     }
   }
   
+  console.log(`File not found: ${filePath}`);
   return { exists: false };
 }
 
