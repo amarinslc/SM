@@ -7,6 +7,7 @@ import { pool } from "./db";
 import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { promisify } from 'util';
+import { sendFollowRequestNotification, sendNewPostNotification } from './push-notifications';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const randomBytesAsync = promisify(randomBytes);
@@ -146,7 +147,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Follower user not found");
     }
 
-    if (follower.followingCount >= 150) {
+    if ((follower.followingCount ?? 0) >= 150) {
       throw new Error("You have reached the maximum number of follows (150)");
     }
 
@@ -156,6 +157,21 @@ export class DatabaseStorage implements IStorage {
       followingId,
       isPending: targetUser.isPrivate,
     });
+    
+    // Send push notification for follow request if the account is private
+    if (targetUser.isPrivate) {
+      try {
+        // We don't await here to avoid blocking the request
+        sendFollowRequestNotification(
+          followingId,
+          follower.name || follower.username,
+          followerId
+        ).catch(err => console.error('Error sending follow request notification:', err));
+      } catch (error) {
+        console.error('Failed to send follow request notification:', error);
+        // Continue without failing the follow request
+      }
+    }
   }
 
   async unfollowUser(followerId: number, followingId: number): Promise<void> {
@@ -292,6 +308,50 @@ export class DatabaseStorage implements IStorage {
         media,
       })
       .returning();
+    
+    // Get the post author for notifications
+    try {
+      const [author] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (author) {
+        // Get all confirmed followers to notify them about the new post
+        const followers = await db
+          .select()
+          .from(follows)
+          .where(
+            and(
+              eq(follows.followingId, userId),
+              eq(follows.isPending, false)
+            )
+          );
+        
+        // Send notifications to followers in the background
+        if (followers.length > 0) {
+          const authorName = author.name || author.username;
+          
+          // We don't await this to avoid blocking the request
+          Promise.all(
+            followers.map(follower => 
+              sendNewPostNotification(
+                follower.followerId, 
+                authorName,
+                userId, 
+                post.id
+              ).catch(err => console.error(`Failed to send notification to follower ${follower.followerId}:`, err))
+            )
+          ).catch(err => {
+            console.error('Error sending post notifications:', err);
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error sending post notifications:', error);
+      // Continue without failing the post creation
+    }
+    
     return post;
   }
 
@@ -469,6 +529,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async acceptFollowRequest(followerId: number, followingId: number): Promise<void> {
+    let followerUser: User | undefined;
+    let followingUser: User | undefined;
+    
     await db.transaction(async (tx) => {
       // Get the follow request
       const [followRequest] = await tx
@@ -507,7 +570,43 @@ export class DatabaseStorage implements IStorage {
         .update(users)
         .set({ followerCount: sql`${users.followerCount} + 1` })
         .where(eq(users.id, followingId));
+        
+      // Get user data for notifications
+      const followerResult = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, followerId));
+      
+      if (followerResult.length > 0) {
+        followerUser = followerResult[0];
+      }
+        
+      const followingResult = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, followingId));
+        
+      if (followingResult.length > 0) {
+        followingUser = followingResult[0];
+      }
     });
+    
+    // Send notification to the follower about accepted request
+    if (followerUser && followingUser) {
+      try {
+        // Send notification in the background
+        const followingName = followingUser.name || followingUser.username;
+        sendNewPostNotification(
+          followerId, 
+          `${followingName} accepted your follow request`, 
+          followingId,
+          0 // No post ID for this notification type
+        ).catch(err => console.error('Error sending follow acceptance notification:', err));
+      } catch (error) {
+        console.error('Failed to send follow acceptance notification:', error);
+        // Continue without failing the request
+      }
+    }
   }
 
   async rejectFollowRequest(followerId: number, followingId: number): Promise<void> {

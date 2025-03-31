@@ -1,5 +1,6 @@
 import { PostCard } from "@/components/post-card";
 import { UserCard } from "@/components/user-card";
+import { NotificationSettings } from "@/components/notification-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
@@ -43,6 +44,9 @@ export default function ProfilePage() {
         <div className="grid md:grid-cols-[300px_1fr] gap-6">
           <div className="space-y-4">
             <UserCard user={user} isFollowing={isFollowing} />
+            {currentUser?.id === user.id && (
+              <NotificationSettings />
+            )}
           </div>
 
           <div className="space-y-6">
