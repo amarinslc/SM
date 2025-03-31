@@ -30,15 +30,18 @@ export const db = drizzle({ client: pool, schema });
 
 // Add more robust event listeners for connection issues
 pool.on('error', (err) => {
-  console.error('Database pool error:', err);
-  // Don't exit the process immediately, let reconnection happen
+  // Don't log the entire error object to prevent exposing credentials
   const errorCode = (err as any).code;
+  const errorMessage = (err as any).message || 'Unknown error';
+  console.error(`Database pool error: ${errorCode} - ${errorMessage}`);
+  
+  // Don't exit the process immediately, let reconnection happen
   if (errorCode === '57P01') {
     console.log('Connection terminated by administrator, will automatically reconnect');
   } else if (errorCode === 'ECONNRESET' || errorCode === 'EPIPE') {
     console.log('Connection reset, will automatically reconnect');
   } else {
-    console.error('Unexpected database error:', err);
+    console.error(`Unexpected database error: ${errorCode}`);
   }
 });
 
@@ -51,7 +54,13 @@ export async function connect() {
     client.release(); // Important: release the client back to the pool
     return true;
   } catch (err) {
-    console.error('Failed to connect to PostgreSQL database:', err);
-    throw err;
+    // Log error details without exposing connection string
+    const errorCode = (err as any).code;
+    const errorMessage = (err as any).message || 'Unknown error';
+    console.error(`Failed to connect to PostgreSQL database: ${errorCode} - ${errorMessage}`);
+    
+    // Create a sanitized error without connection details
+    const sanitizedError = new Error(`Database connection failed: ${errorCode}`);
+    throw sanitizedError;
   }
 }

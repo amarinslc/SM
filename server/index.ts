@@ -90,12 +90,18 @@ function setupHealthCheck() {
         await client.query('SELECT 1'); // Simple query to check connection
         console.log("Database health check: OK");
       } catch (err) {
-        console.error("Database health check failed:", err);
+        // Log only essential error info to avoid exposing credentials
+        const errorCode = (err as any).code;
+        const errorMessage = (err as any).message || 'Unknown error';
+        console.error(`Database health check failed: ${errorCode} - ${errorMessage}`);
       } finally {
         client.release(); // Always release the client
       }
     } catch (err) {
-      console.error("Failed to get client for health check:", err);
+      // Log only essential error info to avoid exposing credentials
+      const errorCode = (err as any).code;
+      const errorMessage = (err as any).message || 'Unknown error';
+      console.error(`Failed to get client for health check: ${errorCode} - ${errorMessage}`);
     }
   }, HEALTH_CHECK_INTERVAL);
 }
@@ -130,7 +136,9 @@ async function gracefulShutdown() {
     await Promise.race([poolClosePromise, timeoutPromise]);
     console.log('Database pool closed successfully');
   } catch (err) {
-    console.error('Error closing database pool:', err);
+    // Log only essential error info to avoid exposing credentials
+    const errorMessage = (err as any).message || 'Unknown error';
+    console.error(`Error closing database pool: ${errorMessage}`);
   }
   
   process.exit(0);
@@ -138,10 +146,13 @@ async function gracefulShutdown() {
 
 // Error handling middleware
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Server error:', err);
+  // Sanitize error output to avoid exposing sensitive information
+  const errorCode = err.code || 'Unknown';
+  const errorMessage = err.message || "Internal Server Error";
+  console.error(`Server error: ${errorCode} - ${errorMessage}`);
+  
   const status = err.status || err.statusCode || 500;
-  const message = err.message || "Internal Server Error";
-  res.status(status).json({ message });
+  res.status(status).json({ message: errorMessage });
 });
 
 (async () => {
@@ -167,7 +178,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       log(`Server running on http://0.0.0.0:${port}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    // Sanitize error output to avoid exposing credentials
+    const errorMessage = (error as any).message || 'Unknown error';
+    console.error('Failed to start server:', errorMessage);
     process.exit(1);
   }
 })();
