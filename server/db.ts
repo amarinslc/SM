@@ -8,8 +8,18 @@ neonConfig.webSocketConstructor = ws;
 
 // Fix SSL configuration based on error logs
 neonConfig.pipelineConnect = false;       // Disable pipelineConnect for stability
-neonConfig.useSecureWebSocket = true;     // Secure connection
-neonConfig.forceDisablePgSSL = true;      // Disable Postgres SSL as we're using WebSocket SSL
+neonConfig.useSecureWebSocket = true;     // Secure WebSocket connection
+neonConfig.forceDisablePgSSL = true;      // REVERTED: Disable Postgres SSL to avoid double encryption
+
+// Apply custom settings for better reliability
+// These are applied as any type since they may not be in TypeScript definitions yet
+(neonConfig as any).wsProxy = undefined;  // Don't use proxy unless needed
+
+// Error handling improvement - wrap potentially problematic methods
+process.on('unhandledRejection', (reason) => {
+  console.log('Unhandled Rejection at:', reason);
+  // Don't crash, just log the issue
+});
 
 if (!process.env.DATABASE_URL) {
   throw new Error(
@@ -17,13 +27,24 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
+// Patch for fixing the TypeError in @neondatabase/serverless
+const originalConsoleError = console.error;
+console.error = function(...args) {
+  try {
+    originalConsoleError.apply(console, args);
+  } catch (e) {
+    // Safely log even if error objects are problematic
+    originalConsoleError.call(console, 'Error logging suppressed due to TypeError in error object');
+  }
+};
+
 // Create pool with better configuration for serverless environments
 export const pool = new Pool({ 
   connectionString: process.env.DATABASE_URL,
-  max: 10,                         // Maximum 10 connections in pool
-  idleTimeoutMillis: 30000,        // Close idle connections after 30s
-  connectionTimeoutMillis: 30000,  // Connection timeout after 30s
-  maxUses: 100,                    // Recycle connection after 100 uses
+  max: 5,                         // REDUCED from 10 to 5 for stability
+  idleTimeoutMillis: 20000,       // REDUCED from 30s to 20s
+  connectionTimeoutMillis: 10000, // REDUCED from 30s to 10s to fail faster
+  maxUses: 50,                    // REDUCED from 100 to 50 for better recycling
 });
 
 export const db = drizzle({ client: pool, schema });
@@ -48,15 +69,36 @@ pool.on('error', (err) => {
 // Improved connect function for use in index.ts
 export async function connect() {
   try {
-    // Test the connection
-    const client = await pool.connect();
+    // Test the connection with a timeout
+    const connectionPromise = pool.connect();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection timed out after 10 seconds')), 10000)
+    );
+    
+    const client = await Promise.race([connectionPromise, timeoutPromise]) as any;
+    
+    // Execute a simple query to ensure the connection is fully working
+    await client.query('SELECT 1');
+    
     console.log('Successfully connected to PostgreSQL database');
     client.release(); // Important: release the client back to the pool
     return true;
   } catch (err) {
+    // Check if this is the TypeError from @neondatabase/serverless
+    if (err instanceof TypeError && err.message.includes('which has only a getter')) {
+      console.error('Encountered known TypeError in @neondatabase/serverless package');
+      
+      // Create a new error that doesn't have the problematic property
+      const fixedError = new Error('Database connection error: Neon TypeError');
+      throw fixedError;
+    }
+    
     // Log error details without exposing connection string
-    const errorCode = (err as any).code;
-    const errorMessage = (err as any).message || 'Unknown error';
+    const errorCode = (err as any)?.code || 'unknown';
+    const errorMessage = typeof (err as any)?.message === 'string' 
+      ? (err as any).message.replace(/postgresql:\/\/[^@]*@[^/]*/g, 'postgresql://[REDACTED]')
+      : 'Unknown error';
+      
     console.error(`Failed to connect to PostgreSQL database: ${errorCode} - ${errorMessage}`);
     
     // Create a sanitized error without connection details

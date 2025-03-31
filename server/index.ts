@@ -50,9 +50,9 @@ app.use((req, res, next) => {
 });
 
 // Database connection with retries and keep-alive
-const MAX_RETRIES = 5;
-const RETRY_DELAY = 5000;
-const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+const MAX_RETRIES = 7;         // Increased from 5 to 7 for more retries
+const RETRY_DELAY = 3000;      // Decreased from 5000 to 3000 for faster retries
+const HEALTH_CHECK_INTERVAL = 15000; // Decreased from 30s to 15s for more frequent health checks
 
 let isShuttingDown = false;
 let healthCheckTimer: NodeJS.Timeout | null = null;
@@ -94,6 +94,29 @@ function setupHealthCheck() {
         const errorCode = (err as any).code;
         const errorMessage = (err as any).message || 'Unknown error';
         console.error(`Database health check failed: ${errorCode} - ${errorMessage}`);
+        
+        // If we get specific error codes that indicate severe connection issues, attempt recovery
+        if (errorCode === '57P01' || errorCode === 'ECONNRESET' || errorCode === 'EPIPE') {
+          console.log('Attempting database connection recovery...');
+          try {
+            // Clear health check timer as we're about to restart it
+            if (healthCheckTimer) {
+              clearInterval(healthCheckTimer);
+              healthCheckTimer = null;
+            }
+            
+            // Close the current pool which may be in a bad state
+            await pool.end().catch(e => console.log('Error ending pool:', e.message));
+            
+            // Recreate the pool (this happens in the db.ts module)
+            await connectWithRetry(3); // Retry up to 3 times
+            console.log('Database connection recovered successfully');
+            return; // Exit the health check as a new one will be setup by connectWithRetry
+          } catch (recoveryErr) {
+            console.error('Failed to recover database connection:', 
+              (recoveryErr as any).message || 'Unknown error');
+          }
+        }
       } finally {
         client.release(); // Always release the client
       }

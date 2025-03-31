@@ -1,0 +1,110 @@
+2025-03-31 09:10:05.27
+d56b6770
+User
+Database health check: OK
+2025-03-31 09:12:55.09
+9fbf29e6
+System
+system: received signal terminated
+2025-03-31 09:12:55.19
+9fbf29e6
+System
+command finished with error [sh -c npm run dev]: exit status 143
+2025-03-31 09:12:55.28
+9fbf29e6
+System
+main done, exiting
+2025-03-31 09:13:39.07
+d56b6770
+User
+Database health check failed: 57P01 - terminating connection due to administrator command
+2025-03-31 09:13:44.17
+d56b6770
+User
+Database pool error: undefined - Connection terminated unexpectedly
+2025-03-31 09:13:44.17
+d56b6770
+User
+Unexpected database error: undefined
+2025-03-31 09:15:06.57
+d56b6770
+User
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384
+2025-03-31 09:15:06.57
+d56b6770
+User
+connect",o),this._clients=this._clients.filter(u=>u!==t),s&&(o.message="Connect\
+2025-03-31 09:15:06.57
+d56b6770
+User
+^
+2025-03-31 09:15:06.57
+d56b6770
+User
+2025-03-31 09:15:06.57
+d56b6770
+User
+TypeError: Cannot set property message of # which has only a getter
+2025-03-31 09:15:06.57
+d56b6770
+User
+at An._connectionCallback (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1384:72)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at An._handleErrorWhileConnecting (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1290:38)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at An._handleErrorEvent (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1291:33)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at fn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at v.reportStreamError (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1201:46)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:986:42)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at WebSocket.onError (/home/runner/workspace/node_modules/ws/lib/event-target.js:230:9)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at WebSocket.emit (node:events:518:28)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at emitErrorAndClose (/home/runner/workspace/node_modules/ws/lib/websocket.js:1041:13)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at processTicksAndRejections (node:internal/process/task_queues:82:21)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at runNextTicks (node:internal/process/task_queues:64:3)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at listOnTimeout (node:internal/timers:545:9)
+2025-03-31 09:15:06.57
+d56b6770
+User
+at process.processTimers (node:internal/timers:519:7)
+2025-03-31 09:15:06.57
+d56b6770
+User
