@@ -18,12 +18,6 @@ import {
   runFullVerification
 } from './file-verification';
 import { isAdmin } from './middlewares/admin-check';
-import { 
-  saveSubscription, 
-  deleteSubscription, 
-  sendFollowRequestNotification,
-  sendNewPostNotification
-} from './push-notifications';
 
 // Use ONLY Replit's persistent .data folder for file storage
 // This is critical for file persistence across deployments
@@ -846,72 +840,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Only serve files from the persistent storage
   app.use('/uploads', express.static(persistentUploadsPath));
-
-  // Push notification endpoints
-  app.post("/api/push/subscribe", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    try {
-      const subscription = req.body;
-      
-      if (!subscription || !subscription.endpoint) {
-        return res.status(400).json({ error: "Invalid subscription data" });
-      }
-      
-      const result = await saveSubscription(subscription, req.user!.id);
-      
-      if (result) {
-        res.status(201).json({ message: "Subscription saved" });
-      } else {
-        res.status(500).json({ error: "Failed to save subscription" });
-      }
-    } catch (error) {
-      console.error("Error saving push subscription:", error);
-      res.status(500).json({ 
-        error: "Failed to save subscription",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-  
-  app.delete("/api/push/unsubscribe", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    try {
-      const { endpoint } = req.body;
-      
-      if (!endpoint) {
-        return res.status(400).json({ error: "Endpoint is required" });
-      }
-      
-      const result = await deleteSubscription(endpoint);
-      
-      if (result) {
-        res.status(200).json({ message: "Subscription deleted" });
-      } else {
-        res.status(500).json({ error: "Failed to delete subscription" });
-      }
-    } catch (error) {
-      console.error("Error deleting push subscription:", error);
-      res.status(500).json({ 
-        error: "Failed to delete subscription",
-        details: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-  
-  // Endpoint to get VAPID public key
-  app.get("/api/push/vapid-public-key", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    
-    const publicKey = process.env.PUBLIC_VAPID_KEY;
-    
-    if (!publicKey) {
-      return res.status(500).json({ error: "VAPID keys not configured" });
-    }
-    
-    res.json({ publicKey });
-  });
 
   const httpServer = createServer(app);
   return httpServer;
