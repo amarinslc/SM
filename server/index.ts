@@ -90,14 +90,74 @@ function setupHealthCheck() {
         await client.query('SELECT 1'); // Simple query to check connection
         console.log("Database health check: OK");
       } catch (err) {
-        // Log only essential error info to avoid exposing credentials
-        const errorCode = (err as any).code;
-        const errorMessage = (err as any).message || 'Unknown error';
-        console.error(`Database health check failed: ${errorCode} - ${errorMessage}`);
-        
-        // If we get specific error codes that indicate severe connection issues, attempt recovery
-        if (errorCode === '57P01' || errorCode === 'ECONNRESET' || errorCode === 'EPIPE') {
-          console.log('Attempting database connection recovery...');
+        try {
+          // Log only essential error info to avoid exposing credentials
+          const errorCode = (err as any).code;
+          let errorMessage = 'Unknown error';
+          
+          // Safely extract error message to prevent TypeError
+          try {
+            if (typeof (err as any).message === 'string') {
+              errorMessage = (err as any).message;
+            }
+          } catch (messageErr) {
+            console.error('Error accessing error message property');
+          }
+          
+          console.error(`Database health check failed: ${errorCode} - ${errorMessage}`);
+          
+          // If we get specific error codes that indicate severe connection issues, attempt recovery
+          if (errorCode === '57P01' || errorCode === 'ECONNRESET' || errorCode === 'EPIPE') {
+            console.log('Attempting database connection recovery...');
+            try {
+              // Clear health check timer as we're about to restart it
+              if (healthCheckTimer) {
+                clearInterval(healthCheckTimer);
+                healthCheckTimer = null;
+              }
+              
+              // Close the current pool which may be in a bad state
+              await pool.end().catch(e => {
+                try {
+                  console.log('Error ending pool:', e.message);
+                } catch {
+                  console.log('Error ending pool: [Error accessing error object]');
+                }
+              });
+              
+              // Recreate the pool (this happens in the db.ts module)
+              await connectWithRetry(3); // Retry up to 3 times
+              console.log('Database connection recovered successfully');
+              return; // Exit the health check as a new one will be setup by connectWithRetry
+            } catch (recoveryErr) {
+              try {
+                console.error('Failed to recover database connection:', 
+                  (recoveryErr as any)?.message || 'Unknown error');
+              } catch {
+                console.error('Failed to recover database connection: [Error accessing error object]');
+              }
+            }
+          }
+        } catch (handlingErr) {
+          // Extra safety net in case error handling itself fails
+          console.error('Error while handling database check error');
+        }
+      } finally {
+        try {
+          client.release(); // Always release the client
+        } catch (releaseErr) {
+          console.error('Error releasing client');
+        }
+      }
+    } catch (err) {
+      try {
+        // Handle the @neondatabase/serverless TypeError
+        if (err instanceof TypeError && err.toString().includes('has only a getter')) {
+          console.error('Caught TypeError in health check (Neon database connection issue)');
+          
+          // Trigger reconnection without trying to access the error object
+          console.log('Attempting database connection recovery due to TypeError...');
+          
           try {
             // Clear health check timer as we're about to restart it
             if (healthCheckTimer) {
@@ -105,26 +165,34 @@ function setupHealthCheck() {
               healthCheckTimer = null;
             }
             
-            // Close the current pool which may be in a bad state
-            await pool.end().catch(e => console.log('Error ending pool:', e.message));
-            
             // Recreate the pool (this happens in the db.ts module)
             await connectWithRetry(3); // Retry up to 3 times
-            console.log('Database connection recovered successfully');
+            console.log('Database connection recovered successfully after TypeError');
             return; // Exit the health check as a new one will be setup by connectWithRetry
           } catch (recoveryErr) {
-            console.error('Failed to recover database connection:', 
-              (recoveryErr as any).message || 'Unknown error');
+            console.error('Failed to recover database connection after TypeError');
           }
+          return;
         }
-      } finally {
-        client.release(); // Always release the client
+        
+        // Log only essential error info to avoid exposing credentials
+        let errorCode = 'unknown';
+        let errorMessage = 'Unknown error';
+        
+        try {
+          errorCode = (err as any)?.code || 'unknown';
+          if (typeof (err as any)?.message === 'string') {
+            errorMessage = (err as any).message;
+          }
+        } catch (propErr) {
+          console.error('Error accessing error properties');
+        }
+        
+        console.error(`Failed to get client for health check: ${errorCode} - ${errorMessage}`);
+      } catch (handlingErr) {
+        // Last resort error handling
+        console.error('Error while handling client connection error');
       }
-    } catch (err) {
-      // Log only essential error info to avoid exposing credentials
-      const errorCode = (err as any).code;
-      const errorMessage = (err as any).message || 'Unknown error';
-      console.error(`Failed to get client for health check: ${errorCode} - ${errorMessage}`);
     }
   }, HEALTH_CHECK_INTERVAL);
 }

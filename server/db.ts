@@ -27,16 +27,42 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-// Patch for fixing the TypeError in @neondatabase/serverless
+// Enhanced patch for fixing the TypeError in @neondatabase/serverless
 const originalConsoleError = console.error;
 console.error = function(...args) {
   try {
+    // Check if we're dealing with a TypeError related to the read-only property
+    const firstArg = args[0];
+    if (typeof firstArg === 'object' && 
+        firstArg instanceof Error && 
+        firstArg.message && 
+        firstArg.message.includes('has only a getter')) {
+      originalConsoleError.call(console, 'Intercepted Neon database error: Connection issue detected');
+      return; // Don't propagate the problematic error
+    }
     originalConsoleError.apply(console, args);
   } catch (e) {
     // Safely log even if error objects are problematic
     originalConsoleError.call(console, 'Error logging suppressed due to TypeError in error object');
   }
 };
+
+// Global error handler for unhandled promise rejections that might crash the server
+process.on('unhandledRejection', (reason, promise) => {
+  try {
+    console.log('Unhandled Rejection at:', promise);
+    if (reason instanceof Error) {
+      // Sanitize the message to avoid exposing credentials
+      const sanitizedMessage = reason.message.replace(/postgresql:\/\/[^@]*@[^/]*/g, 'postgresql://[REDACTED]');
+      console.log('Reason:', sanitizedMessage);
+    } else {
+      console.log('Reason:', reason);
+    }
+  } catch (e) {
+    console.log('Error in unhandledRejection handler');
+  }
+  // Don't exit the process, let it recover
+});
 
 // Create pool with better configuration for serverless environments
 export const pool = new Pool({ 
