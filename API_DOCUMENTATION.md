@@ -147,11 +147,16 @@ The API uses cookie-based authentication. When the user logs in, session cookies
   ```
 
 #### Get User Posts
-- **URL**: `/users/:id/posts`
+- **URL**: There are two supported formats:
+  - `/users/:id/posts` (preferred for iOS)
+  - `/posts/:id` (path parameter)
+  - `/posts?userId=id` (query parameter)
 - **Method**: `GET`
 - **Description**: Get posts from a specific user
 - **Response**: Array of post objects
 - **Notes**: Only returns posts if user is followed or account is public
+
+**Important**: Use the `/users/:id/posts` format for iOS integration as it's explicitly designed for the iOS app.
 
 #### Get Feed
 - **URL**: `/feed`

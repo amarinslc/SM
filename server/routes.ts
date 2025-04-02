@@ -488,16 +488,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/posts/:userId", async (req, res) => {
+  // Support both path and query parameters for posts lookup
+  app.get("/api/posts/:userId?", async (req, res) => {
     try {
+      // Get userId from either path parameter or query parameter
+      const userIdParam = req.params.userId || req.query.userId || '';
+      
+      if (!userIdParam) {
+        return res.status(400).json({ error: "Missing userId parameter" });
+      }
+      
+      const userId = parseInt(userIdParam.toString());
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid userId parameter" });
+      }
+      
       const posts = await storage.getPosts(
-        parseInt(req.params.userId),
+        userId,
         req.isAuthenticated() ? req.user!.id : undefined
       );
+      
       res.json(posts);
     } catch (error) {
       console.error("Error fetching posts:", error);
       res.status(500).json({ error: "Failed to fetch posts" });
+    }
+  });
+  
+  // Add specific route for user posts for iOS API compatibility
+  app.get("/api/users/:userId/posts", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      if (isNaN(userId)) {
+        return res.status(400).json({ error: "Invalid userId parameter" });
+      }
+      
+      const posts = await storage.getPosts(
+        userId,
+        req.isAuthenticated() ? req.user!.id : undefined
+      );
+      
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching user posts:", error);
+      res.status(500).json({ error: "Failed to fetch user posts" });
     }
   });
 
