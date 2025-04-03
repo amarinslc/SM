@@ -22,9 +22,12 @@ export function PostCard({ post }: PostCardProps) {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
-  const { data: author } = useQuery<User>({
+  const { data: authorData } = useQuery<{ user: User; isFollowing: boolean; isPending: boolean }>({
     queryKey: [`/api/users/${post.userId}`],
   });
+  
+  // Extract author from the response
+  const author = authorData?.user;
 
   const { data: comments } = useQuery<Comment[]>({
     queryKey: [`/api/posts/${post.id}/comments`],

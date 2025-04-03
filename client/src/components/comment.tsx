@@ -9,9 +9,12 @@ interface CommentProps {
 }
 
 export function CommentView({ comment }: CommentProps) {
-  const { data: author } = useQuery<User>({
+  const { data: authorData } = useQuery<{ user: User; isFollowing: boolean; isPending: boolean }>({
     queryKey: [`/api/users/${comment.userId}`],
   });
+  
+  // Extract author from the response
+  const author = authorData?.user;
 
   if (!author) return null;
 
