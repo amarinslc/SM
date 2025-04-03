@@ -1,5 +1,7 @@
 # Dunbar Social API Documentation for iOS Integration
 
+> **IMPORTANT UPDATE (April 2025)**: Authentication and user profile endpoints now return relationship status information. All user-related responses have been updated to a consistent format that includes `isFollowing` and `isPending` flags to indicate the relationship between users. See the updated response formats in the endpoint documentation below.
+
 ## Base URL
 - Development: `http://localhost:5000/api`
 - Production: `https://dbsocial.replit.app/api`
@@ -27,22 +29,28 @@ The API uses cookie-based authentication. When the user logs in, session cookies
     "password": "string"
   }
   ```
-- **Response**: User object
+- **Response**: User object with relationship status
   ```json
   {
-    "id": 1,
-    "username": "jdoe",
-    "email": "john.doe@example.com",
-    "bio": "Hello world",
-    "photo": "https://res.cloudinary.com/dgrs48tas/image/upload/v123456789/profile.jpg",
-    "isAdmin": false,
-    "createdAt": "2025-01-01T00:00:00.000Z",
-    "isPrivate": true,
-    "displayName": "John Doe"
+    "user": {
+      "id": 1,
+      "username": "jdoe",
+      "email": "john.doe@example.com",
+      "bio": "Hello world",
+      "photo": "https://res.cloudinary.com/dgrs48tas/image/upload/v123456789/profile.jpg",
+      "isAdmin": false,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "isPrivate": true,
+      "displayName": "John Doe"
+    },
+    "isFollowing": false,
+    "isPending": false
   }
   ```
 - **Error Responses**:
   - 401 Unauthorized: Invalid credentials
+  
+> **Note**: The `isFollowing` and `isPending` values will always be `false` for your own profile, but this format is used for consistency with other user profile endpoints.
 
 #### Register
 - **URL**: `/register`
@@ -57,7 +65,25 @@ The API uses cookie-based authentication. When the user logs in, session cookies
     "displayName": "string"
   }
   ```
-- **Response**: User object (same as login)
+- **Response**: User object with relationship status (same format as login)
+  ```json
+  {
+    "user": {
+      "id": 1,
+      "username": "jdoe",
+      "email": "john.doe@example.com",
+      "bio": null,
+      "photo": null,
+      "isAdmin": false,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "isPrivate": true,
+      "displayName": "John Doe",
+      "message": "Please check your email to verify your account"
+    },
+    "isFollowing": false,
+    "isPending": false
+  }
+  ```
 - **Error Responses**:
   - 400 Bad Request: Username already exists or invalid data
 
@@ -72,7 +98,25 @@ The API uses cookie-based authentication. When the user logs in, session cookies
 - **URL**: `/user`
 - **Method**: `GET`
 - **Description**: Get the currently authenticated user
-- **Response**: User object (same as login) or 401 if not logged in
+- **Response**: User object with relationship status (same format as login) or 401 if not logged in
+  ```json
+  {
+    "user": {
+      "id": 1,
+      "username": "jdoe",
+      "email": "john.doe@example.com",
+      "bio": "Hello world",
+      "photo": "https://res.cloudinary.com/dgrs48tas/image/upload/v123456789/profile.jpg",
+      "isAdmin": false,
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "isPrivate": true,
+      "displayName": "John Doe",
+      "emailVerified": true
+    },
+    "isFollowing": false,
+    "isPending": false
+  }
+  ```
 
 ### User Management
 

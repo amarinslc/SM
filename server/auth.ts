@@ -78,7 +78,12 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
     console.log("Login successful, sending response");
-    res.status(200).json(req.user);
+    // Return user with relationship status (always false for own profile)
+    res.status(200).json({
+      user: req.user,
+      isFollowing: false,
+      isPending: false
+    });
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -118,9 +123,14 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
+        // Return user with relationship status (always false for own profile)
         res.status(201).json({ 
-          ...user,
-          message: "Please check your email to verify your account" 
+          user: {
+            ...user,
+            message: "Please check your email to verify your account"
+          },
+          isFollowing: false,
+          isPending: false
         });
       });
     } catch (error) {
@@ -173,9 +183,14 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     const isVerified = await storage.isEmailVerified(req.user!.id);
+    // Return user with relationship status (always false for own profile)
     res.json({
-      ...req.user,
-      emailVerified: isVerified
+      user: {
+        ...req.user,
+        emailVerified: isVerified
+      },
+      isFollowing: false,
+      isPending: false
     });
   });
 }

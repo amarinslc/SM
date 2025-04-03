@@ -8,13 +8,20 @@ import { insertUserSchema, User as SelectUser, InsertUser } from "@shared/schema
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
+// Define the response type that includes relationship status
+type UserResponse = {
+  user: SelectUser;
+  isFollowing: boolean;
+  isPending: boolean;
+};
+
 type AuthContextType = {
   user: SelectUser | null;
   isLoading: boolean;
   error: Error | null;
-  loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
+  loginMutation: UseMutationResult<UserResponse, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
-  registerMutation: UseMutationResult<SelectUser, Error, FormData | InsertUser>;
+  registerMutation: UseMutationResult<UserResponse, Error, FormData | InsertUser>;
 };
 
 type LoginData = Pick<InsertUser, "username" | "password">;
@@ -24,21 +31,24 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const {
-    data: user,
+    data: userResponse,
     error,
     isLoading,
-  } = useQuery<SelectUser | undefined, Error>({
+  } = useQuery<UserResponse | undefined, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+
+  // Extract just the user from the response
+  const user = userResponse?.user;
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (response: UserResponse) => {
+      queryClient.setQueryData(["/api/user"], response);
       // Clear all existing queries and refetch feed data
       queryClient.removeQueries({ queryKey: ["/api/feed"] });
       queryClient.removeQueries({ queryKey: ["/api/users"] });
@@ -74,8 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return await res.json();
     },
-    onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+    onSuccess: (response: UserResponse) => {
+      queryClient.setQueryData(["/api/user"], response);
       // Clear cached data and refetch feed
       queryClient.removeQueries({ queryKey: ["/api/feed"] });
       queryClient.removeQueries({ queryKey: ["/api/users"] });

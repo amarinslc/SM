@@ -1,5 +1,21 @@
 // API Test Client for Dunbar iOS App
 // This file contains sample code for testing the API endpoints
+//
+// ** IMPORTANT API RESPONSE FORMAT UPDATE (April 2025) **
+// The authentication-related endpoints now return a structured response with relationship status:
+// {
+//   "user": { ... user object ... },
+//   "isFollowing": false,
+//   "isPending": false
+// }
+//
+// Affected endpoints:
+// - /api/login
+// - /api/register
+// - /api/user (current user)
+// - /api/users/:id (user profile)
+//
+// This client includes fallback logic to handle both the new and old response formats.
 
 import Foundation
 import UIKit
@@ -186,15 +202,28 @@ class APITestClient {
                 do {
                     let decoder = JSONDecoder()
                     decoder.dateDecodingStrategy = .iso8601
-                    let user = try decoder.decode(User.self, from: data)
+                    
+                    // Try to decode the new response format (AuthResponse)
+                    let authResponse = try decoder.decode(AuthResponse.self, from: data)
                     print("✅ Login successful")
-                    completion(true, user)
+                    print("📊 Relationship status - isFollowing: \(authResponse.isFollowing), isPending: \(authResponse.isPending)")
+                    
+                    // Return just the user part
+                    completion(true, authResponse.user)
                 } catch {
-                    print("❌ Failed to decode user: \(error.localizedDescription)")
-                    if let dataString = String(data: data, encoding: .utf8) {
-                        print("📊 Raw response: \(dataString)")
+                    print("❌ Failed to decode auth response: \(error.localizedDescription)")
+                    
+                    // Fallback: try to decode the old format (just User)
+                    do {
+                        let user = try decoder.decode(User.self, from: data)
+                        print("✅ Login successful (legacy format)")
+                        completion(true, user)
+                    } catch {
+                        if let dataString = String(data: data, encoding: .utf8) {
+                            print("📊 Raw response: \(dataString)")
+                        }
+                        completion(false, nil)
                     }
-                    completion(false, nil)
                 }
             }
             

@@ -130,6 +130,13 @@ struct FollowRequestUser: Codable, Identifiable {
 
 // MARK: - Authentication Models
 
+struct AuthResponse: Codable {
+    let user: User
+    let isFollowing: Bool
+    let isPending: Bool
+    let message: String?
+}
+
 struct LoginCredentials: Codable {
     let username: String
     let password: String

@@ -118,18 +118,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = parseInt(req.params.id);
 
+      // If the user is requesting their own profile, return full data
       if (req.isAuthenticated() && req.user!.id === userId) {
         const user = await storage.getFullUserData(userId);
         if (!user) return res.status(404).send("User not found");
-        return res.json(user);
+        
+        // Return with relationship status (always false for own profile)
+        return res.json({
+          user,
+          isFollowing: false,
+          isPending: false
+        });
       }
 
-      const user = await storage.getUser(userId);
-      if (!user) return res.status(404).send("User not found");
-      return res.json(user);
+      // For other users' profiles, get profile with relationship status
+      const profile = await storage.getUserProfile(
+        userId, 
+        req.isAuthenticated() ? req.user!.id : undefined
+      );
+      
+      if (!profile) return res.status(404).send("User not found");
+      
+      return res.json(profile);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ error: "Failed to fetch user data" });
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ error: "Failed to fetch user profile" });
     }
   });
 
@@ -139,7 +152,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = await storage.getFullUserData(req.user!.id);
       if (!user) return res.status(404).send("User not found");
-      res.json(user);
+      
+      // Return with relationship status (always false for own profile)
+      res.json({
+        user,
+        isFollowing: false,
+        isPending: false
+      });
     } catch (error) {
       console.error("Error fetching current user:", error);
       res.status(500).json({ error: "Failed to fetch user data" });
@@ -397,7 +416,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Registration successful:", user.username);
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        
+        // Return with relationship status (always false for own profile)
+        res.status(201).json({
+          user,
+          isFollowing: false,
+          isPending: false
+        });
       });
     } catch (error) {
       console.error("Registration error:", error);

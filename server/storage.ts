@@ -13,6 +13,13 @@ const randomBytesAsync = promisify(randomBytes);
 
 const PostgresSessionStore = connectPg(session);
 
+// Define a user profile with relationship data
+export interface UserProfileWithRelationship {
+  user: User;
+  isFollowing: boolean;
+  isPending: boolean;
+}
+
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -44,6 +51,9 @@ export interface IStorage {
   getFullUserData(id: number): Promise<User | undefined>;
   searchUsers(query: string): Promise<User[]>;
   deleteUser(id: number): Promise<void>;
+  getUserProfile(userId: number, viewerId?: number): Promise<UserProfileWithRelationship | undefined>;
+  isFollowing(followerId: number, followingId: number): Promise<boolean>;
+  hasFollowRequest(followerId: number, followingId: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -146,7 +156,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Follower user not found");
     }
 
-    if (follower.followingCount >= 150) {
+    if ((follower.followingCount ?? 0) >= 150) {
       throw new Error("You have reached the maximum number of follows (150)");
     }
 
@@ -389,17 +399,68 @@ export class DatabaseStorage implements IStorage {
       .orderBy(comments.createdAt);
   }
 
-  private async isFollowing(followerId: number, followingId: number): Promise<boolean> {
+  async isFollowing(followerId: number, followingId: number): Promise<boolean> {
     const [follow] = await db
       .select()
       .from(follows)
       .where(
         and(
           eq(follows.followerId, followerId),
-          eq(follows.followingId, followingId)
+          eq(follows.followingId, followingId),
+          eq(follows.isPending, false)
         )
       );
     return !!follow;
+  }
+  
+  async hasFollowRequest(followerId: number, followingId: number): Promise<boolean> {
+    const [follow] = await db
+      .select()
+      .from(follows)
+      .where(
+        and(
+          eq(follows.followerId, followerId),
+          eq(follows.followingId, followingId),
+          eq(follows.isPending, true)
+        )
+      );
+    return !!follow;
+  }
+  
+  async getUserProfile(userId: number, viewerId?: number): Promise<UserProfileWithRelationship | undefined> {
+    // Get the base user data
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    if (!viewerId) {
+      // Return profile without relationship data for unauthenticated users
+      return {
+        user,
+        isFollowing: false,
+        isPending: false
+      };
+    }
+    
+    // If it's the same user, they're not following themselves
+    if (userId === viewerId) {
+      return {
+        user,
+        isFollowing: false,
+        isPending: false
+      };
+    }
+    
+    // Check if the viewer is following the user
+    const isFollowing = await this.isFollowing(viewerId, userId);
+    
+    // Check if the viewer has a pending follow request to the user
+    const isPending = await this.hasFollowRequest(viewerId, userId);
+    
+    return {
+      user,
+      isFollowing,
+      isPending
+    };
   }
 
   async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
@@ -701,17 +762,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const searchResults = await db
-        .select({
-          id: users.id,
-          username: users.username,
-          name: users.name,
-          bio: users.bio,
-          photo: users.photo,
-          followerCount: sql`COALESCE(${users.followerCount}, 0)::integer`,
-          followingCount: sql`COALESCE(${users.followingCount}, 0)::integer`,
-          isPrivate: sql`COALESCE(${users.isPrivate}, false)::boolean`,
-          emailVerified: users.emailVerified,
-        })
+        .select()
         .from(users)
         .where(
           and(
@@ -726,7 +777,16 @@ export class DatabaseStorage implements IStorage {
         .orderBy(users.username)
         .limit(20);
 
-      return searchResults;
+      // Process search results to remove sensitive fields
+      return searchResults.map(user => {
+        const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
+        return {
+          ...safeUser,
+          followerCount: safeUser.followerCount ?? 0,
+          followingCount: safeUser.followingCount ?? 0,
+          isPrivate: safeUser.isPrivate ?? false
+        } as User;
+      });
     } catch (error) {
       console.error("Search error:", error);
       throw new Error("Failed to search users");
