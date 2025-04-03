@@ -20,10 +20,13 @@ export function UserCard({ user, isFollowing, showRemoveFollower = false }: User
   const { toast } = useToast();
 
   // Fetch follow requests for the current user
-  const { data: followRequests } = useQuery<any[]>({
+  const { data: followRequestsData } = useQuery<any[]>({
     queryKey: currentUser?.id ? [`/api/users/${currentUser.id}/requests`] : [],
     enabled: !!currentUser?.id, 
   });
+  
+  // Make sure we extract the data correctly if it's in a nested structure
+  const followRequests = Array.isArray(followRequestsData) ? followRequestsData : [];
 
   // Safely check if there's a pending request from this user
   const hasPendingRequest = !!(

@@ -114,9 +114,12 @@ export function ProfilePage() {
   const isOwnProfileCalculated = !isValidId || (currentUser && currentUser.id === parsedId);
   
   // All React Query hooks must be called unconditionally at the top level
-  const { data: user, isLoading: isUserLoading } = useQuery<User>({
+  const { data: userData, isLoading: isUserLoading } = useQuery<{ user: User; isFollowing: boolean; isPending: boolean }>({
     queryKey: id ? [`/api/users/${id}`] : ["/api/user"],
   });
+  
+  // Extract user from the response
+  const user = userData?.user;
 
   const { data: posts, isLoading: isPostsLoading } = useQuery<Post[]>({
     queryKey: [`/api/posts/${id || currentUser?.id}`],
