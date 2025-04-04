@@ -8,6 +8,35 @@ import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { promisify } from 'util';
 
+/**
+ * Sanitize user data by removing sensitive fields before sending to client
+ * @param user User object from database
+ * @returns Sanitized user object without sensitive information
+ */
+export function sanitizeUser(user: User | undefined): User | undefined {
+  if (!user) return undefined;
+  
+  // Create a new object without sensitive fields
+  const { 
+    password, 
+    verificationToken, 
+    resetPasswordToken, 
+    resetPasswordExpires, 
+    ...sanitizedUser 
+  } = user;
+  
+  return sanitizedUser as User;
+}
+
+/**
+ * Sanitize an array of user objects
+ * @param users Array of user objects
+ * @returns Array of sanitized user objects
+ */
+export function sanitizeUsers(users: User[]): User[] {
+  return users.map(user => sanitizeUser(user) as User);
+}
+
 const resend = new Resend(process.env.RESEND_API_KEY);
 const randomBytesAsync = promisify(randomBytes);
 
@@ -76,11 +105,9 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.id, id));
-    if (!user) return undefined;
-
-    // Remove sensitive fields for public profile
-    const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
-    return safeUser as User;
+    
+    // Use the sanitizeUser function to remove sensitive fields
+    return sanitizeUser(user);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -273,7 +300,8 @@ export class DatabaseStorage implements IStorage {
       )
       .innerJoin(users, eq(users.id, follows.followerId));
 
-    return followData.map((d) => d.follower);
+    // Sanitize follower data before returning
+    return sanitizeUsers(followData.map((d) => d.follower));
   }
 
   async getFollowing(userId: number): Promise<User[]> {
@@ -290,7 +318,8 @@ export class DatabaseStorage implements IStorage {
       )
       .innerJoin(users, eq(users.id, follows.followingId));
 
-    return followData.map((d) => d.following);
+    // Sanitize following data before returning
+    return sanitizeUsers(followData.map((d) => d.following));
   }
 
   async createPost(userId: number, content: string, media: any[]): Promise<Post> {
@@ -507,7 +536,11 @@ export class DatabaseStorage implements IStorage {
       )
       .innerJoin(users, eq(users.id, follows.followerId));
 
-    return requests;
+    // Sanitize user data in the requests
+    return requests.map(request => ({
+      ...request,
+      follower: sanitizeUser(request.follower)
+    }));
   }
   
   async getOutgoingFollowRequests(userId: number): Promise<any[]> {
@@ -526,7 +559,11 @@ export class DatabaseStorage implements IStorage {
       )
       .innerJoin(users, eq(users.id, follows.followingId));
 
-    return requests;
+    // Sanitize user data in the requests
+    return requests.map(request => ({
+      ...request,
+      following: sanitizeUser(request.following)
+    }));
   }
 
   async acceptFollowRequest(followerId: number, followingId: number): Promise<void> {
@@ -777,16 +814,13 @@ export class DatabaseStorage implements IStorage {
         .orderBy(users.username)
         .limit(20);
 
-      // Process search results to remove sensitive fields
-      return searchResults.map(user => {
-        const { password, email, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = user;
-        return {
-          ...safeUser,
-          followerCount: safeUser.followerCount ?? 0,
-          followingCount: safeUser.followingCount ?? 0,
-          isPrivate: safeUser.isPrivate ?? false
-        } as User;
-      });
+      // Use sanitizeUsers helper function to remove sensitive fields
+      return sanitizeUsers(searchResults).map(user => ({
+        ...user,
+        followerCount: user.followerCount ?? 0,
+        followingCount: user.followingCount ?? 0,
+        isPrivate: user.isPrivate ?? false
+      }));
     } catch (error) {
       console.error("Search error:", error);
       throw new Error("Failed to search users");

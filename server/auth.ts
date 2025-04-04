@@ -4,7 +4,7 @@ import { Express } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage } from "./storage";
+import { storage, sanitizeUser } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
 declare global {
@@ -66,7 +66,8 @@ export function setupAuth(app: Express) {
       }
 
       console.log('Login successful');
-      return done(null, user);
+      // Sanitize user before passing to the authentication
+      return done(null, sanitizeUser(user));
     }),
   );
 
@@ -121,12 +122,15 @@ export function setupAuth(app: Express) {
         // Continue with login even if email fails
       }
 
-      req.login(user, (err) => {
+      // Sanitize user before login
+      const sanitizedUser = sanitizeUser(user);
+      
+      req.login(sanitizedUser, (err) => {
         if (err) return next(err);
         // Return user with relationship status (always false for own profile)
         res.status(201).json({ 
           user: {
-            ...user,
+            ...sanitizedUser,
             message: "Please check your email to verify your account"
           },
           isFollowing: false,
