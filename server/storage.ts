@@ -13,7 +13,9 @@ import { promisify } from 'util';
  * @param user User object from database
  * @returns Sanitized user object without sensitive information
  */
-export function sanitizeUser(user: User | undefined): User | undefined {
+export function sanitizeUser(user: User): Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
+export function sanitizeUser(user: undefined): undefined;
+export function sanitizeUser(user: User | undefined): Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined {
   if (!user) return undefined;
   
   // Create a new object without sensitive fields
@@ -25,7 +27,7 @@ export function sanitizeUser(user: User | undefined): User | undefined {
     ...sanitizedUser 
   } = user;
   
-  return sanitizedUser as User;
+  return sanitizedUser as Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
 }
 
 /**
@@ -106,8 +108,11 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(eq(users.id, id));
     
-    // Use the sanitizeUser function to remove sensitive fields
-    return sanitizeUser(user);
+    if (!user) return undefined;
+    
+    // For now, return the complete user object
+    // Sanitization should be done at the API response level
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
@@ -518,7 +523,14 @@ export class DatabaseStorage implements IStorage {
       throw new Error('User not found');
     }
 
-    return updatedUser;
+    // IMPORTANT: Sanitize user data before returning it
+    const sanitizedUser = sanitizeUser(updatedUser);
+    
+    if (!sanitizedUser) {
+      throw new Error('Failed to sanitize updated user data');
+    }
+    
+    return sanitizedUser as User;
   }
   async getPendingFollowRequests(userId: number): Promise<any[]> {
     const requests = await db

@@ -169,19 +169,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
+    console.log("Profile update request received:");
+    console.log("Body:", req.body);
+    console.log("File:", req.file ? "✅ File present" : "❌ No file");
+    
     try {
       const updateData: Record<string, any> = {};
 
-      // Handle text fields
-      ['name', 'bio'].forEach(field => {
-        if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field].trim();
-        }
-      });
+      // Handle text fields - supporting both snake_case and camelCase for iOS compatibility
+      // Also support JSON parameters from URL-encoded form data
+      if (req.body.name !== undefined) {
+        updateData.name = req.body.name.trim();
+      } else if (req.body.display_name !== undefined) {
+        updateData.name = req.body.display_name.trim();
+      } else if (req.body.displayName !== undefined) {
+        updateData.name = req.body.displayName.trim();
+      }
+
+      if (req.body.bio !== undefined) {
+        updateData.bio = req.body.bio.trim();
+      }
+
+      // Handle isPrivate field if present (support both formats)
+      if (req.body.isPrivate !== undefined) {
+        const isPrivateValue = req.body.isPrivate;
+        // Handle string "true"/"false" vs boolean values
+        updateData.isPrivate = typeof isPrivateValue === 'string' 
+          ? isPrivateValue.toLowerCase() === 'true'
+          : Boolean(isPrivateValue);
+      } else if (req.body.is_private !== undefined) {
+        const isPrivateValue = req.body.is_private;
+        updateData.isPrivate = typeof isPrivateValue === 'string' 
+          ? isPrivateValue.toLowerCase() === 'true'
+          : Boolean(isPrivateValue);
+      }
+
+      console.log("Processed update data:", updateData);
 
       // Handle photo upload - strict Cloudinary-only approach
       if (req.file) {
         try {
+          console.log("Processing file upload:", req.file.path);
           // Upload to Cloudinary
           const result = await uploadToCloudinary(req.file.path, {
             folder: 'dgrs48tas/users',
@@ -206,6 +234,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const updatedUser = await storage.updateUser(req.user!.id, updateData);
+      
+      // Return a properly formatted response that matches what the iOS client expects
+      // The updateUser method now ensures the user data is sanitized
       res.json(updatedUser);
     } catch (error) {
       console.error('Profile update error:', error);

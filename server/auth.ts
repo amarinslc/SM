@@ -79,9 +79,13 @@ export function setupAuth(app: Express) {
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
     console.log("Login successful, sending response");
+    
+    // IMPORTANT: Sanitize user data to remove password hash
+    const sanitizedUser = sanitizeUser(req.user);
+    
     // Return user with relationship status (always false for own profile)
     res.status(200).json({
-      user: req.user,
+      user: sanitizedUser,
       isFollowing: false,
       isPending: false
     });
@@ -122,11 +126,14 @@ export function setupAuth(app: Express) {
         // Continue with login even if email fails
       }
 
-      // Sanitize user before login
-      const sanitizedUser = sanitizeUser(user);
-      
-      req.login(sanitizedUser, (err) => {
+      // For login purposes, we need to use the full user object with password
+      // We'll sanitize it before sending the response
+      req.login(user, (err) => {
         if (err) return next(err);
+        
+        // Sanitize the user data to remove sensitive information
+        const sanitizedUser = sanitizeUser(user);
+        
         // Return user with relationship status (always false for own profile)
         res.status(201).json({ 
           user: {
@@ -187,10 +194,18 @@ export function setupAuth(app: Express) {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     const isVerified = await storage.isEmailVerified(req.user!.id);
+    
+    // IMPORTANT: Sanitize user data to remove password hash
+    const sanitizedUser = sanitizeUser(req.user);
+    
+    if (!sanitizedUser) {
+      return res.status(500).json({ error: "Failed to sanitize user data" });
+    }
+    
     // Return user with relationship status (always false for own profile)
     res.json({
       user: {
-        ...req.user,
+        ...sanitizedUser,
         emailVerified: isVerified
       },
       isFollowing: false,
