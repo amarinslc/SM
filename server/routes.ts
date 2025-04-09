@@ -166,82 +166,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  app.patch("/api/user/profile", upload.single('photo'), async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-
-    console.log("Profile update request received:");
-    console.log("Body:", req.body);
-    console.log("File:", req.file ? "✅ File present" : "❌ No file");
+  app.patch("/api/user/profile", (req, res, next) => {
+    // Global error handler for this route to always return JSON
+    const handleError = (status: number, message: string) => {
+      console.error(`Profile update error: ${message}`);
+      return res.status(status).json({ 
+        success: false,
+        error: message
+      });
+    };
     
-    try {
-      const updateData: Record<string, any> = {};
-
-      // Handle text fields - supporting both snake_case and camelCase for iOS compatibility
-      // Also support JSON parameters from URL-encoded form data
-      if (req.body.name !== undefined) {
-        updateData.name = req.body.name.trim();
-      } else if (req.body.display_name !== undefined) {
-        updateData.name = req.body.display_name.trim();
-      } else if (req.body.displayName !== undefined) {
-        updateData.name = req.body.displayName.trim();
-      }
-
-      if (req.body.bio !== undefined) {
-        updateData.bio = req.body.bio.trim();
-      }
-
-      // Handle isPrivate field if present (support both formats)
-      if (req.body.isPrivate !== undefined) {
-        const isPrivateValue = req.body.isPrivate;
-        // Handle string "true"/"false" vs boolean values
-        updateData.isPrivate = typeof isPrivateValue === 'string' 
-          ? isPrivateValue.toLowerCase() === 'true'
-          : Boolean(isPrivateValue);
-      } else if (req.body.is_private !== undefined) {
-        const isPrivateValue = req.body.is_private;
-        updateData.isPrivate = typeof isPrivateValue === 'string' 
-          ? isPrivateValue.toLowerCase() === 'true'
-          : Boolean(isPrivateValue);
-      }
-
-      console.log("Processed update data:", updateData);
-
-      // Handle photo upload - strict Cloudinary-only approach
-      if (req.file) {
-        try {
-          console.log("Processing file upload:", req.file.path);
-          // Upload to Cloudinary
-          const result = await uploadToCloudinary(req.file.path, {
-            folder: 'dgrs48tas/users',
-          });
-          
-          // Use the Cloudinary secure URL for the photo
-          updateData.photo = result.secure_url;
-          
-          console.log(`Uploaded user photo to Cloudinary: ${result.secure_url}`);
-        } catch (err) {
-          console.error('Cloudinary upload failed:', err);
-          // No fallback - return error to client
-          return res.status(500).json({ 
-            error: "Failed to upload profile photo. Please try again later." 
-          });
-        }
-      }
-
-      // Check if there are any changes to update
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ message: "No changes detected" });
-      }
-
-      const updatedUser = await storage.updateUser(req.user!.id, updateData);
-      
-      // Return a properly formatted response that matches what the iOS client expects
-      // The updateUser method now ensures the user data is sanitized
-      res.json(updatedUser);
-    } catch (error) {
-      console.error('Profile update error:', error);
-      res.status(400).json({ message: error instanceof Error ? error.message : "Failed to update profile" });
+    // Authentication check
+    if (!req.isAuthenticated()) {
+      return handleError(401, "Authentication required");
     }
+    
+    // Pass control to multer middleware with error handling
+    upload.single('photo')(req, res, async (err) => {
+      if (err) {
+        // Handle multer errors properly as JSON
+        return handleError(400, err.message || "Invalid file upload");
+      }
+      
+      console.log("Profile update request received:");
+      console.log("Body:", req.body);
+      console.log("File:", req.file ? "✅ File present" : "❌ No file");
+      
+      try {
+        const updateData: Record<string, any> = {};
+  
+        // Handle text fields - supporting both snake_case and camelCase for iOS compatibility
+        // Also support JSON parameters from URL-encoded form data
+        if (req.body.name !== undefined) {
+          updateData.name = req.body.name.trim();
+        } else if (req.body.display_name !== undefined) {
+          updateData.name = req.body.display_name.trim();
+        } else if (req.body.displayName !== undefined) {
+          updateData.name = req.body.displayName.trim();
+        }
+  
+        if (req.body.bio !== undefined) {
+          updateData.bio = req.body.bio.trim();
+        }
+  
+        // Handle isPrivate field if present (support both formats)
+        if (req.body.isPrivate !== undefined) {
+          const isPrivateValue = req.body.isPrivate;
+          // Handle string "true"/"false" vs boolean values
+          updateData.isPrivate = typeof isPrivateValue === 'string' 
+            ? isPrivateValue.toLowerCase() === 'true'
+            : Boolean(isPrivateValue);
+        } else if (req.body.is_private !== undefined) {
+          const isPrivateValue = req.body.is_private;
+          updateData.isPrivate = typeof isPrivateValue === 'string' 
+            ? isPrivateValue.toLowerCase() === 'true'
+            : Boolean(isPrivateValue);
+        }
+  
+        console.log("Processed update data:", updateData);
+  
+        // Handle photo upload - strict Cloudinary-only approach
+        if (req.file) {
+          try {
+            console.log("Processing file upload:", req.file.path);
+            // Upload to Cloudinary
+            const result = await uploadToCloudinary(req.file.path, {
+              folder: 'dgrs48tas/users',
+            });
+            
+            // Use the Cloudinary secure URL for the photo
+            updateData.photo = result.secure_url;
+            
+            console.log(`Uploaded user photo to Cloudinary: ${result.secure_url}`);
+          } catch (err) {
+            console.error('Cloudinary upload failed:', err);
+            // No fallback - return error to client as JSON
+            return handleError(500, "Failed to upload profile photo. Please try again later.");
+          }
+        }
+  
+        // Check if there are any changes to update
+        if (Object.keys(updateData).length === 0) {
+          return handleError(400, "No changes detected");
+        }
+  
+        const updatedUser = await storage.updateUser(req.user!.id, updateData);
+        
+        // Return a properly formatted response that matches what the iOS client expects
+        // The updateUser method now ensures the user data is sanitized
+        return res.status(200).json({
+          success: true,
+          user: updatedUser
+        });
+      } catch (error) {
+        // Any error in the process returns a JSON response
+        return handleError(400, error instanceof Error ? error.message : "Failed to update profile");
+      }
+    });
   });
 
   app.post("/api/users/:id/follow", async (req, res) => {
