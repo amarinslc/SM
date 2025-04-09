@@ -4,12 +4,13 @@ import { Express } from "express";
 import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { storage, sanitizeUser } from "./storage";
+import { storage, sanitizeUser, SanitizedUser } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 
 declare global {
   namespace Express {
-    interface User extends SelectUser {}
+    // Use SanitizedUser instead of full User to prevent password exposure
+    interface User extends SanitizedUser {}
   }
 }
 
@@ -73,19 +74,26 @@ export function setupAuth(app: Express) {
 
   passport.serializeUser((user, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
-    const user = await storage.getUser(id);
-    done(null, user);
+    try {
+      const user = await storage.getUser(id);
+      if (!user) {
+        return done(null, false);
+      }
+      // Sanitize the user to prevent password leakage
+      const sanitizedUser = sanitizeUser(user);
+      done(null, sanitizedUser);
+    } catch (error) {
+      done(error, null);
+    }
   });
 
   app.post("/api/login", passport.authenticate("local"), (req, res) => {
     console.log("Login successful, sending response");
     
-    // IMPORTANT: Sanitize user data to remove password hash
-    const sanitizedUser = sanitizeUser(req.user);
-    
+    // req.user is already sanitized from the LocalStrategy done() callback
     // Return user with relationship status (always false for own profile)
     res.status(200).json({
-      user: sanitizedUser,
+      user: req.user,
       isFollowing: false,
       isPending: false
     });
@@ -127,17 +135,14 @@ export function setupAuth(app: Express) {
       }
 
       // For login purposes, we need to use the full user object with password
-      // We'll sanitize it before sending the response
+      // The login process will sanitize it automatically via deserializeUser
       req.login(user, (err) => {
         if (err) return next(err);
-        
-        // Sanitize the user data to remove sensitive information
-        const sanitizedUser = sanitizeUser(user);
         
         // Return user with relationship status (always false for own profile)
         res.status(201).json({ 
           user: {
-            ...sanitizedUser,
+            ...req.user,
             message: "Please check your email to verify your account"
           },
           isFollowing: false,
@@ -195,19 +200,13 @@ export function setupAuth(app: Express) {
 
     const isVerified = await storage.isEmailVerified(req.user!.id);
     
-    // IMPORTANT: Sanitize user data to remove password hash
-    const sanitizedUser = sanitizeUser(req.user);
-    
-    if (!sanitizedUser) {
-      return res.status(500).json({ error: "Failed to sanitize user data" });
-    }
+    // req.user is already sanitized at deserialization point,
+    // but we do a deep copy to prevent any mutations
+    const userData = {...req.user, emailVerified: isVerified};
     
     // Return user with relationship status (always false for own profile)
     res.json({
-      user: {
-        ...sanitizedUser,
-        emailVerified: isVerified
-      },
+      user: userData,
       isFollowing: false,
       isPending: false
     });

@@ -13,21 +13,30 @@ import { promisify } from 'util';
  * @param user User object from database
  * @returns Sanitized user object without sensitive information
  */
-export function sanitizeUser(user: User): Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
+export type SanitizedUser = Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
+
+export function sanitizeUser(user: User): SanitizedUser;
 export function sanitizeUser(user: undefined): undefined;
-export function sanitizeUser(user: User | undefined): Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined {
+export function sanitizeUser(user: User | undefined): SanitizedUser | undefined {
   if (!user) return undefined;
   
-  // Create a new object without sensitive fields
-  const { 
-    password, 
-    verificationToken, 
-    resetPasswordToken, 
-    resetPasswordExpires, 
-    ...sanitizedUser 
-  } = user;
+  // Create a new object with just the fields we want to return
+  // This ensures that even if the type definition changes, we only return safe fields
+  const sanitizedUser: SanitizedUser = {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    name: user.name,
+    bio: user.bio,
+    photo: user.photo,
+    followerCount: user.followerCount,
+    followingCount: user.followingCount,
+    isPrivate: user.isPrivate,
+    emailVerified: user.emailVerified,
+    role: user.role
+  };
   
-  return sanitizedUser as Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
+  return sanitizedUser;
 }
 
 /**
@@ -35,8 +44,8 @@ export function sanitizeUser(user: User | undefined): Omit<User, 'password' | 'v
  * @param users Array of user objects
  * @returns Array of sanitized user objects
  */
-export function sanitizeUsers(users: User[]): User[] {
-  return users.map(user => sanitizeUser(user) as User);
+export function sanitizeUsers(users: User[]): SanitizedUser[] {
+  return users.map(user => sanitizeUser(user));
 }
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -46,45 +55,60 @@ const PostgresSessionStore = connectPg(session);
 
 // Define a user profile with relationship data
 export interface UserProfileWithRelationship {
-  user: User;
+  user: SanitizedUser;
   isFollowing: boolean;
   isPending: boolean;
 }
 
 export interface IStorage {
+  // Methods that need full user data for internal operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User>;
+  
+  // Methods that return sanitized user data to clients
+  updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<SanitizedUser>;
   followUser(followerId: number, followingId: number): Promise<void>;
   unfollowUser(followerId: number, followingId: number): Promise<void>;
   removeFollower(userId: number, followerId: number): Promise<void>;
-  getFollowers(userId: number): Promise<User[]>;
-  getFollowing(userId: number): Promise<User[]>;
+  getFollowers(userId: number): Promise<SanitizedUser[]>;
+  getFollowing(userId: number): Promise<SanitizedUser[]>;
+  
+  // Post and comment operations
   createPost(userId: number, content: string, media: any[]): Promise<Post>;
   getPosts(userId: number, viewerId?: number): Promise<Post[]>;
   getFeed(userId: number): Promise<Post[]>;
-  sessionStore: session.Store;
   createComment(postId: number, userId: number, content: string): Promise<Comment>;
   getComments(postId: number): Promise<Comment[]>;
+  getPost(id: number): Promise<Post | undefined>;
+  deletePost(id: number): Promise<void>;
+  
+  // Follow request operations
   getPendingFollowRequests(userId: number): Promise<any[]>;
   getOutgoingFollowRequests(userId: number): Promise<any[]>;
   acceptFollowRequest(followerId: number, followingId: number): Promise<void>;
   rejectFollowRequest(followerId: number, followingId: number): Promise<void>;
-  getPost(id: number): Promise<Post | undefined>;
-  deletePost(id: number): Promise<void>;
+  
+  // Email and account operations
   verifyEmail(token: string): Promise<boolean>;
   sendVerificationEmail(userId: number, email: string): Promise<void>;
   isEmailVerified(userId: number): Promise<boolean>;
   sendPasswordResetEmail(email: string): Promise<void>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
-  getFullUserData(id: number): Promise<User | undefined>;
-  searchUsers(query: string): Promise<User[]>;
+  
+  // Special operations
+  getFullUserData(id: number): Promise<Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined>;
+  searchUsers(query: string): Promise<SanitizedUser[]>;
   deleteUser(id: number): Promise<void>;
   getUserProfile(userId: number, viewerId?: number): Promise<UserProfileWithRelationship | undefined>;
+  
+  // Relationship checks
   isFollowing(followerId: number, followingId: number): Promise<boolean>;
   hasFollowRequest(followerId: number, followingId: number): Promise<boolean>;
+  
+  // Session management
+  sessionStore: session.Store;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -291,7 +315,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getFollowers(userId: number): Promise<User[]> {
+  async getFollowers(userId: number): Promise<SanitizedUser[]> {
     const followData = await db
       .select({
         follower: users,
@@ -309,7 +333,7 @@ export class DatabaseStorage implements IStorage {
     return sanitizeUsers(followData.map((d) => d.follower));
   }
 
-  async getFollowing(userId: number): Promise<User[]> {
+  async getFollowing(userId: number): Promise<SanitizedUser[]> {
     const followData = await db
       .select({
         following: users,
@@ -466,10 +490,13 @@ export class DatabaseStorage implements IStorage {
     const user = await this.getUser(userId);
     if (!user) return undefined;
     
+    // Always sanitize the user data to remove sensitive information
+    const sanitizedUser = sanitizeUser(user);
+    
     if (!viewerId) {
       // Return profile without relationship data for unauthenticated users
       return {
-        user,
+        user: sanitizedUser,
         isFollowing: false,
         isPending: false
       };
@@ -478,7 +505,7 @@ export class DatabaseStorage implements IStorage {
     // If it's the same user, they're not following themselves
     if (userId === viewerId) {
       return {
-        user,
+        user: sanitizedUser,
         isFollowing: false,
         isPending: false
       };
@@ -491,13 +518,13 @@ export class DatabaseStorage implements IStorage {
     const isPending = await this.hasFollowRequest(viewerId, userId);
     
     return {
-      user,
+      user: sanitizedUser,
       isFollowing,
       isPending
     };
   }
 
-  async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<User> {
+  async updateUser(id: number, data: Partial<Omit<User, 'id' | 'username'>>): Promise<SanitizedUser> {
     console.log('Storage: updateUser called with data:', data);
 
     // Ensure we have data to update
@@ -530,7 +557,7 @@ export class DatabaseStorage implements IStorage {
       throw new Error('Failed to sanitize updated user data');
     }
     
-    return sanitizedUser as User;
+    return sanitizedUser;
   }
   async getPendingFollowRequests(userId: number): Promise<any[]> {
     const requests = await db
@@ -792,16 +819,16 @@ export class DatabaseStorage implements IStorage {
     return user?.emailVerified ?? false;
   }
 
-  async getFullUserData(id: number): Promise<User | undefined> {
+  async getFullUserData(id: number): Promise<Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     if (!user) return undefined;
 
     // Remove only security-sensitive fields, keep profile data including email
     const { password, verificationToken, resetPasswordToken, resetPasswordExpires, ...fullUser } = user;
-    return fullUser as User;
+    return fullUser;
   }
 
-  async searchUsers(query: string): Promise<User[]> {
+  async searchUsers(query: string): Promise<SanitizedUser[]> {
     try {
       // Normalize the search query
       const normalizedQuery = query.toLowerCase().trim();
@@ -826,8 +853,10 @@ export class DatabaseStorage implements IStorage {
         .orderBy(users.username)
         .limit(20);
 
-      // Use sanitizeUsers helper function to remove sensitive fields
-      return sanitizeUsers(searchResults).map(user => ({
+      // Use sanitizeUsers helper function to remove sensitive fields and ensure defaults
+      const sanitizedResults = sanitizeUsers(searchResults);
+      
+      return sanitizedResults.map(user => ({
         ...user,
         followerCount: user.followerCount ?? 0,
         followingCount: user.followingCount ?? 0,
