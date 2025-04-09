@@ -2,6 +2,68 @@
 
 > **IMPORTANT UPDATE (April 2025)**: Authentication and user profile endpoints now return relationship status information. All user-related responses have been updated to a consistent format that includes `isFollowing` and `isPending` flags to indicate the relationship between users. See the updated response formats in the endpoint documentation below.
 
+## Standardized Response Format for User Data
+
+To improve consistency and provide relationship status information for all user-related API requests, all endpoints that return user data now follow this standard format:
+
+```json
+{
+  "user": {
+    "id": 1,
+    "username": "username",
+    "email": "email@example.com",
+    "name": "Display Name",
+    "bio": "User bio",
+    "photo": "photo_url",
+    "followerCount": 10,
+    "followingCount": 20,
+    "isPrivate": true,
+    "emailVerified": true,
+    "role": "user"
+  },
+  "isFollowing": false,
+  "isPending": false
+}
+```
+
+Notes:
+- This format applies to all user profile endpoints (`/user`, `/users/:id`, `/login`, `/register`)
+- For your own profile, `isFollowing` and `isPending` will always be `false`
+- Email addresses and other sensitive information are never included in responses to non-owners
+- Password hashes and security tokens are never included in any responses
+
+## Standardized Response Format for User Data
+
+To improve consistency and provide relationship status information for all user-related API requests, all endpoints that return user data now follow this standard format:
+
+```json
+{
+  "user": {
+    // User object with all fields EXCEPT sensitive information 
+    // (password, verification tokens, etc. are never included)
+    "id": 1,
+    "username": "username",
+    "email": "email@example.com",
+    "name": "Display Name",
+    "bio": "User bio",
+    "photo": "photo_url",
+    "followerCount": 10,
+    "followingCount": 20,
+    "isPrivate": true,
+    "emailVerified": true,
+    "role": "user"
+  },
+  "isFollowing": false,  // Whether the authenticated user follows this user
+  "isPending": false     // Whether the authenticated user has a pending follow request to this user
+}
+```
+
+Notes:
+- This format applies to all user profile endpoints (`/user`, `/users/:id`, `/login`, `/register`)
+- For your own profile, `isFollowing` and `isPending` will always be `false`
+- Email addresses and other sensitive information are never included in responses to non-owners
+- Password hashes and security tokens are never included in any responses
+
 ## Base URL
 - Development: `http://localhost:5000/api`
 - Production: `https://dbsocial.replit.app/api`

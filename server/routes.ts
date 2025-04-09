@@ -341,6 +341,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Add routes matching documentation for iOS client compatibility
+  app.get("/api/follow-requests/pending", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const requests = await storage.getPendingFollowRequests(req.user!.id);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting requests:", error);
+      res.status(500).json({ error: "Failed to get requests" });
+    }
+  });
+  
+  app.get("/api/follow-requests/outgoing", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const requests = await storage.getOutgoingFollowRequests(req.user!.id);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error getting outgoing requests:", error);
+      res.status(500).json({ error: "Failed to get outgoing requests" });
+    }
+  });
+
   app.post("/api/users/requests/:id/accept", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
@@ -353,6 +378,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/users/requests/:id/reject", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.rejectFollowRequest(parseInt(req.params.id), req.user!.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error rejecting request:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+  
+  // Add routes matching documentation for iOS client compatibility
+  app.post("/api/follow-requests/:id/accept", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      await storage.acceptFollowRequest(parseInt(req.params.id), req.user!.id);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error accepting request:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+
+  app.post("/api/follow-requests/:id/reject", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       await storage.rejectFollowRequest(parseInt(req.params.id), req.user!.id);
