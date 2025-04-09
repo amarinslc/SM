@@ -8,7 +8,7 @@ import path from "path";
 import fs from "fs/promises";
 import express from 'express';
 import { hashPassword } from './auth';
-import { db } from './db';
+import { db, pool } from './db';
 import { and, eq } from 'drizzle-orm';
 import { uploadToCloudinary, checkCloudinaryHealth } from './cloudinary';
 import { 
@@ -809,12 +809,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lightweight wake-up endpoint (no DB or external service checks)
+  app.get("/api/wake", (req, res) => {
+    res.status(200).json({
+      status: "awake",
+      timestamp: new Date().toISOString(),
+      service: "Dunbar Social API",
+      message: "Server is awake and responding"
+    });
+  });
+
+  // Simple ping endpoint for iOS app health checks
+  app.get("/api/ping", (req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString() 
+    });
+  });
+
   // Add a health check endpoint for Cloudinary
   app.get("/api/storage/health", async (req, res) => {
-    try {
-      const cloudinaryStatus = await checkCloudinaryHealth();
+    // Track components that fail to avoid cascading errors
+    const status = {
+      server: "healthy",
+      database: "unknown",
+      cloudinary: "unknown",
+      storage: "unknown"
+    };
 
-      // Also check persistent directory health
+    let shouldReturnEarly = false;
+    
+    // Phase 1: Check database connection (minimal)
+    try {
+      // Try to get a client but don't run any query yet
+      const client = await pool.connect();
+      
+      try {
+        // Simple database ping
+        await client.query('SELECT 1');
+        status.database = "healthy";
+      } catch (dbQueryErr) {
+        console.error('Database query error during health check:', 
+                     (dbQueryErr as Error).message || 'Unknown error');
+        status.database = "error";
+        shouldReturnEarly = true;
+      } finally {
+        // Always release the client
+        try {
+          client.release();
+        } catch (releaseErr) {
+          console.error('Error releasing client during health check');
+        }
+      }
+    } catch (dbConnErr) {
+      console.error('Database connection error during health check:', 
+                   (dbConnErr as Error).message || 'Unknown error');
+      status.database = "error";
+      shouldReturnEarly = true;
+    }
+
+    // Return early if database is down to avoid cascading errors
+    if (shouldReturnEarly) {
+      return res.status(200).json({  // Return 200 even on error for wake-up compatibility
+        status: "partial",
+        components: status,
+        timestamp: new Date().toISOString(),
+        message: "Health check completed with some components in error state"
+      });
+    }
+
+    // Phase 2: Check Cloudinary and storage
+    try {
+      // Check Cloudinary (with timeout)
+      const cloudinaryPromise = checkCloudinaryHealth();
+      const cloudinaryTimeout = new Promise<any>((resolve) => {
+        setTimeout(() => resolve({ status: 'timeout', configured: false }), 5000);
+      });
+      
+      const cloudinaryStatus = await Promise.race([cloudinaryPromise, cloudinaryTimeout]);
+      
+      if (cloudinaryStatus.status === 'timeout') {
+        status.cloudinary = "timeout";
+      } else if (cloudinaryStatus.status === 'healthy') {
+        status.cloudinary = "healthy";
+      } else {
+        status.cloudinary = "error";
+      }
+
+      // Check persistent directory health
       const persistentStatus = {
         dataDir: false,
         uploadsDir: false,
@@ -840,25 +922,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await fs.writeFile(testFile, 'test', { encoding: 'utf8' });
         await fs.unlink(testFile);
         persistentStatus.accessRights = true;
-      } catch (err) {
-        console.error('Error checking persistent directories:', err);
+        
+        status.storage = "healthy";
+      } catch (storageErr) {
+        console.error('Error checking persistent directories:', storageErr);
+        status.storage = "error";
       }
 
-      res.json({
-        ...cloudinaryStatus,
-        persistentStorage: {
-          status: Object.values(persistentStatus).every(v => v) ? 'healthy' : 'issues',
-          details: persistentStatus
-        }
+      // Return full health check response
+      res.status(200).json({
+        status: Object.values(status).every(s => s === "healthy") ? "healthy" : "degraded",
+        components: status,
+        details: {
+          cloudinary: cloudinaryStatus,
+          persistentStorage: {
+            status: Object.values(persistentStatus).every(v => v) ? 'healthy' : 'issues',
+            details: persistentStatus
+          }
+        },
+        timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error("Error checking Cloudinary health:", error);
-      res.status(500).json({
-        configured: false,
-        status: 'error',
-        details: {
-          error: error instanceof Error ? error.message : "Unknown error"
-        }
+      console.error('Health check error:', error);
+      res.status(200).json({  // Return 200 even on error for wake-up compatibility
+        status: "error",
+        components: status,
+        error: (error as Error).message,
+        timestamp: new Date().toISOString()
       });
     }
   });

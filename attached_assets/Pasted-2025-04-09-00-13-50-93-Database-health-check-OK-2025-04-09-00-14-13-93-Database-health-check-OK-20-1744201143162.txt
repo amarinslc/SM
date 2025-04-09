@@ -1,0 +1,72 @@
+2025-04-09 00:13:50.93
+Database health check: OK
+2025-04-09 00:14:13.93
+Database health check: OK
+2025-04-09 00:14:21.13
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+2025-04-09 00:14:21.13
+npx update-browserslist-db@latest
+2025-04-09 00:14:21.13
+Why you should do it regularly: https://github.com/browserslist/update-db#readme
+2025-04-09 00:17:37.93
+Database health check failed: 57P01 - terminating connection due to administrator command
+2025-04-09 00:17:37.93
+Attempting database connection recovery...
+2025-04-09 00:17:39.33
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:395
+2025-04-09 00:17:39.33
+0&&(o=t[0]),o instanceof Error)throw o;var u=new Error("Unhandled error."+(o?" ("+
+2025-04-09 00:17:39.33
+^
+2025-04-09 00:17:39.33
+2025-04-09 00:17:39.33
+Error: Connection terminated unexpectedly
+2025-04-09 00:17:39.33
+at fn. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1250:44)
+2025-04-09 00:17:39.33
+at Object.onceWrapper (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:410:15)
+2025-04-09 00:17:39.33
+at fn.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-04-09 00:17:39.33
+at v. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1202:66)
+2025-04-09 00:17:39.33
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-04-09 00:17:39.33
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:988:51)
+2025-04-09 00:17:39.33
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2025-04-09 00:17:39.33
+at WebSocket.onClose (/home/runner/workspace/node_modules/ws/lib/event-target.js:220:9)
+2025-04-09 00:17:39.33
+at WebSocket.emit (node:events:518:28)
+2025-04-09 00:17:39.33
+at WebSocket.emitClose (/home/runner/workspace/node_modules/ws/lib/websocket.js:272:10)
+2025-04-09 00:17:39.33
+at TLSSocket.socketOnClose (/home/runner/workspace/node_modules/ws/lib/websocket.js:1341:15)
+2025-04-09 00:17:39.33
+at TLSSocket.emit (node:events:530:35)
+2025-04-09 00:17:39.33
+at node:net:343:12
+2025-04-09 00:17:39.33
+at TCP.done (node:_tls_wrap:648:7)
+2025-04-09 00:17:39.33
+2025-04-09 00:17:39.33
+Node.js v20.18.1
+2025-04-09 00:17:44.63
+npm notice
+2025-04-09 00:17:44.63
+npm notice New major version of npm available! 10.8.2 -> 11.3.0
+2025-04-09 00:17:44.63
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.3.0
+2025-04-09 00:17:44.63
+npm notice To update run: npm install -g npm@11.3.0
+2025-04-09 00:17:44.63
+npm notice
+2025-04-09 00:17:45.63
+command finished with error [sh -c npm run dev]: exit status 1
+2025-04-09 00:17:56.22
+system: received signal terminated
+2025-04-09 00:17:56.23
+command finished with error [sh -c npm run dev]: signal: terminated
+2025-04-09 00:17:56.40
+main done, exiting
