@@ -189,9 +189,6 @@ class APIService {
             } else {
                 do {
                     request.httpBody = try JSONSerialization.data(withJSONObject: parameters, options: [])
-                    if let bodyData = request.httpBody {
-                        print("📦 Request body: \(String(data: bodyData, encoding: .utf8) ?? "Unable to stringify body")")
-                    }
                 } catch {
                     print("❌ JSONSerialization error: \(error)")
                     return Fail(error: NetworkError.requestFailed(error)).eraseToAnyPublisher()
@@ -308,7 +305,7 @@ class APIService {
                     // For small text responses that aren't JSON but we still want to accept
                     if let responseText = String(data: data, encoding: .utf8),
                        data.count < 200 && !responseText.starts(with: "<") &&
-                       (T.self == FollowResponse.self) {
+                        (T.self == FollowResponse.self) {
                         return Just(FollowResponse(success: true, message: responseText) as! T)
                             .setFailureType(to: NetworkError.self)
                             .eraseToAnyPublisher()
@@ -326,7 +323,7 @@ class APIService {
                             if success {
                                 print("✅ Auth refreshed, retrying request")
                                 return self.request(endpoint: endpoint, method: method,
-                                                  parameters: parameters, retryForAuth: false)
+                                                    parameters: parameters, retryForAuth: false)
                             } else {
                                 print("❌ Auth refresh failed")
                                 return Fail(error: NetworkError.unauthorized).eraseToAnyPublisher()
@@ -473,6 +470,7 @@ class APIService {
     // Function for multipart/form-data requests (for file uploads)
     func uploadMultipart<T: Decodable>(
         endpoint: String,
+        method: HTTPMethod = .post,  // Add this parameter
         parameters: [String: Any],
         imageData: [Data]? = nil,
         imageFieldName: String = "media"
@@ -487,10 +485,10 @@ class APIService {
         let boundary = "Boundary-\(UUID().uuidString)"
         
         var request = URLRequest(url: url)
-        request.httpMethod = HTTPMethod.post.rawValue
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpMethod = method.rawValue     // Use the provided method (can be PATCH)
+        request.setValue("multipart/form-data; boundary=\(boundary)",
+                         forHTTPHeaderField: "Content-Type")
         
-        // Add cookie explicitly from cookie storage
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         if !cookies.isEmpty {
             print("🍪 Adding cookies to multipart request: \(cookies)")
@@ -502,18 +500,17 @@ class APIService {
         
         var body = Data()
         
-        // Add text parameters
+        // Append text parameters
         for (key, value) in parameters {
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"\(key)\"\r\n\r\n".data(using: .utf8)!)
             body.append("\(value)\r\n".data(using: .utf8)!)
         }
         
-        // Add image data if provided
+        // Append image data if provided
         if let imageData = imageData {
             for (index, data) in imageData.enumerated() {
                 let filename = "image\(index).jpg"
-                
                 body.append("--\(boundary)\r\n".data(using: .utf8)!)
                 body.append("Content-Disposition: form-data; name=\"\(imageFieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
                 body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
@@ -522,19 +519,16 @@ class APIService {
             }
         }
         
-        // Add final boundary
+        // Close the multipart form data with boundary
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        
         request.httpBody = body
         
+        // Continue with the existing upload logic...
         return NetworkManager.shared.session.dataTaskPublisher(for: request)
             .tryMap { data, response in
-                // Debug logging
                 print("📲 Multipart response received:")
                 if let httpResponse = response as? HTTPURLResponse {
                     print("🔢 Status code: \(httpResponse.statusCode)")
-                    
-                    // Save any cookies from the response
                     if let headerFields = httpResponse.allHeaderFields as? [String: String] {
                         let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
                         if !cookies.isEmpty {
@@ -545,26 +539,10 @@ class APIService {
                 }
                 
                 if let responseString = String(data: data, encoding: .utf8) {
-                    // Truncate long response strings for logging
-                    let truncatedResponse = responseString.count > 500 ?
-                        String(responseString.prefix(500)) + "..." :
-                        responseString
-                    print("📄 Multipart response data: \(truncatedResponse)")
-                    
-                    // Enhanced HTML detection - check for common HTML tags
-                    if responseString.contains("<!DOCTYPE html>") ||
-                       responseString.contains("<html>") ||
-                       responseString.contains("</html>") {
+                    let trimmedResponse = responseString.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if trimmedResponse.starts(with: "<") {
                         print("⚠️ Received HTML response instead of JSON")
-                        
-                        // Check if it's a login page or error page
-                        if responseString.contains("login") ||
-                           responseString.contains("password") ||
-                           responseString.contains("sign in") {
-                            throw NetworkError.unauthorized
-                        } else {
-                            throw NetworkError.htmlResponse
-                        }
+                        throw NetworkError.htmlResponse
                     }
                 }
                 
@@ -580,7 +558,6 @@ class APIService {
                 case 404:
                     throw NetworkError.notFound
                 case 400...499:
-                    // Try to get error message from response
                     if let errorResponse = try? JSONDecoder.defaultDecoder.decode(APIError.self, from: data) {
                         throw NetworkError.serverError(errorResponse.message)
                     }
@@ -591,84 +568,11 @@ class APIService {
                     throw NetworkError.unknown
                 }
             }
+            .tryMap { data in
+                return try JSONDecoder.defaultDecoder.decode(T.self, from: data)
+            }
             .mapError { error in
-                if let networkError = error as? NetworkError {
-                    // Handle authentication issues by attempting to refresh
-                    if networkError == NetworkError.unauthorized || networkError == NetworkError.htmlResponse {
-                        print("🔄 Authentication issue detected in multipart upload")
-                        return NetworkError.unauthorized
-                    }
-                    return networkError
-                } else {
-                    return NetworkError.requestFailed(error)
-                }
-            }
-            .flatMap { (data: Data) -> AnyPublisher<T, NetworkError> in
-                // Special handling for empty responses
-                if data.count == 0 {
-                    if Bool.self == T.self || Optional<Bool>.self == T.self {
-                        return Just(true as! T)
-                            .setFailureType(to: NetworkError.self)
-                            .eraseToAnyPublisher()
-                    }
-                }
-                
-                do {
-                    // Check if the data is valid JSON before attempting to decode
-                    if let dataString = String(data: data, encoding: .utf8),
-                       dataString.trimmingCharacters(in: .whitespacesAndNewlines).starts(with: "{") ||
-                       dataString.trimmingCharacters(in: .whitespacesAndNewlines).starts(with: "[") {
-                        // Standard JSON decoding with detailed error handling
-                        do {
-                            return Just(try JSONDecoder.defaultDecoder.decode(T.self, from: data))
-                                .setFailureType(to: NetworkError.self)
-                                .eraseToAnyPublisher()
-                        } catch let decodingError as DecodingError {
-                            // Print detailed decoding error information to help diagnose
-                            print("❌ JSON Decoding failed: \(decodingError)")
-                            switch decodingError {
-                            case .keyNotFound(let key, let context):
-                                print("   Missing key: \(key.stringValue) in path: \(context.codingPath.map { $0.stringValue })")
-                            case .typeMismatch(let type, let context):
-                                print("   Type mismatch: Expected \(type) in path: \(context.codingPath.map { $0.stringValue })")
-                            case .valueNotFound(let type, let context):
-                                print("   Value not found: Expected \(type) in path: \(context.codingPath.map { $0.stringValue })")
-                            case .dataCorrupted(let context):
-                                print("   Data corrupted: \(context.debugDescription) in path: \(context.codingPath.map { $0.stringValue })")
-                            @unknown default:
-                                print("   Unknown decoding error")
-                            }
-                            throw decodingError
-                        }
-                    } else {
-                        // Not JSON content
-                        throw NetworkError.decodingFailed(NSError(domain: "Not a JSON response", code: 0, userInfo: nil))
-                    }
-                } catch {
-                    print("❌ Decoding error in multipart upload: \(error)")
-                    return Fail(error: NetworkError.decodingFailed(error)).eraseToAnyPublisher()
-                }
-            }
-            .catch { (error: NetworkError) -> AnyPublisher<T, NetworkError> in
-                // If authentication failed, try to refresh and retry
-                if error == NetworkError.unauthorized || error == NetworkError.htmlResponse {
-                    print("🔄 Attempting to refresh authentication before retrying multipart upload")
-                    return self.refreshAuth()
-                        .flatMap { success -> AnyPublisher<T, NetworkError> in
-                            if success {
-                                print("✅ Auth refreshed, retrying multipart upload")
-                                return self.uploadMultipart(endpoint: endpoint,
-                                                         parameters: parameters,
-                                                         imageData: imageData,
-                                                         imageFieldName: imageFieldName)
-                            } else {
-                                print("❌ Auth refresh failed for multipart upload")
-                                return Fail(error: NetworkError.unauthorized).eraseToAnyPublisher()
-                            }
-                        }
-                        .eraseToAnyPublisher()
-                }
-                return Fail(error: error).eraseToAnyPublisher()
+                return NetworkError.decodingFailed(error)
             }
             .eraseToAnyPublisher()
     }

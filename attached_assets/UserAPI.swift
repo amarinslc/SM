@@ -4,146 +4,145 @@ import Combine
 // User API for user-related requests
 class UserAPI {
     static let shared = UserAPI()
-    
-    // Add a cancellables set for storing subscriptions
     var cancellables = Set<AnyCancellable>()
-    
     private let apiService = APIService.shared
     
     // Get user profile (using correct endpoint path from API docs)
     func getUserProfile(userId: Int) -> AnyPublisher<ProfileResponse, NetworkError> {
         print("🔍 Fetching user profile for ID: \(userId) using new API format")
-        return apiService.request(
-            endpoint: "/users/\(userId)",
-            method: .get
-        )
+        return apiService.request(endpoint: "/users/\(userId)", method: .get)
     }
-
+    
     // Get user posts (using documented endpoint format)
     func getUserPosts(userId: Int) -> AnyPublisher<[ProfilePost], NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/posts",
-            method: .get
-        )
+        return apiService.request(endpoint: "/users/\(userId)/posts", method: .get)
     }
     
     // Search users
     func searchUsers(query: String) -> AnyPublisher<[SimpleUser], NetworkError> {
         let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-        return apiService.request(
-            endpoint: "/users/search?q=\(encodedQuery)",
-            method: .get
-        )
+        return apiService.request(endpoint: "/users/search?q=\(encodedQuery)", method: .get)
     }
     
     // Get follow requests (pending incoming requests)
     func getFollowRequests(userId: Int) -> AnyPublisher<[FollowRequest], NetworkError> {
-        // Using direct follow requests endpoint for logged in user per API docs
-        return apiService.request(
-            endpoint: "/follow-requests/pending",
-            method: .get
-        )
+        return apiService.request(endpoint: "/follow-requests/pending", method: .get)
     }
     
     // Get pending follow requests (incoming)
     func getPendingFollowRequests() -> AnyPublisher<[FollowRequest], NetworkError> {
         print("🔍 Fetching pending follow requests using new API path")
-        return apiService.request(
-            endpoint: "/follow-requests/pending",
-            method: .get
-        )
+        return apiService.request(endpoint: "/follow-requests/pending", method: .get)
     }
     
     // Get outgoing follow requests (sent by current user)
     func getOutgoingFollowRequests() -> AnyPublisher<[FollowRequest], NetworkError> {
         print("🔍 Fetching outgoing follow requests using new API path")
-        return apiService.request(
-            endpoint: "/follow-requests/outgoing",
-            method: .get
-        )
+        return apiService.request(endpoint: "/follow-requests/outgoing", method: .get)
     }
     
     // Get followers
     func getFollowers(userId: Int) -> AnyPublisher<[SimpleUser], NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/followers",
-            method: .get
-        )
+        return apiService.request(endpoint: "/users/\(userId)/followers", method: .get)
     }
     
     // Get following
     func getFollowing(userId: Int) -> AnyPublisher<[SimpleUser], NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/following",
-            method: .get
-        )
+        return apiService.request(endpoint: "/users/\(userId)/following", method: .get)
     }
     
     // Follow a user
     func followUser(userId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/follow",
-            method: .post
-        )
+        return apiService.request(endpoint: "/users/\(userId)/follow", method: .post)
     }
     
     // Unfollow a user
     func unfollowUser(userId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/unfollow",
-            method: .post
-        )
+        return apiService.request(endpoint: "/users/\(userId)/unfollow", method: .post)
     }
     
     // Remove a follower
     func removeFollower(userId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        return apiService.request(
-            endpoint: "/users/\(userId)/remove-follower",
-            method: .post
-        )
+        return apiService.request(endpoint: "/users/\(userId)/remove-follower", method: .post)
     }
     
     // Accept follow request
     func acceptFollowRequest(requestId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
         print("✅ Accepting follow request ID \(requestId)")
-        return apiService.request(
-            endpoint: "/follow-requests/\(requestId)/accept",
-            method: .post
-        )
+        return apiService.request(endpoint: "/follow-requests/\(requestId)/accept", method: .post)
+            .handleEvents(
+                receiveSubscription: { _ in
+                    print("🔶 Accept request subscribed for ID \(requestId)")
+                },
+                receiveOutput: { response in
+                    print("✅ Accept request succeeded for ID \(requestId): \(response)")
+                },
+                receiveCompletion: { completion in
+                    if case let .failure(error) = completion {
+                        print("❌ Accept request failed for ID \(requestId): \(error)")
+                    } else {
+                        print("✅ Accept request completed successfully for ID \(requestId)")
+                    }
+                },
+                receiveCancel: {
+                    print("🚫 Accept request was cancelled for ID \(requestId)")
+                }
+            )
+            .eraseToAnyPublisher()
     }
     
     // Reject follow request - using the new endpoint format
     func rejectFollowRequest(requestId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        print("❌ Rejecting follow request ID \(requestId) using new API path")
-        return apiService.request(
+        print("❌ STARTING Reject follow request ID \(requestId)")
+        
+        // Using explicit typing for the publisher
+        let publisher: AnyPublisher<FollowResponse, NetworkError> = apiService.request(
             endpoint: "/follow-requests/\(requestId)/reject",
             method: .post
         )
+        
+        return publisher
+            .handleEvents(
+                receiveSubscription: { _ in
+                    print("🔶 Reject request subscribed for ID \(requestId)")
+                },
+                receiveOutput: { response in
+                    print("✅ Reject request succeeded for ID \(requestId): \(response)")
+                },
+                receiveCompletion: { completion in
+                    if case let .failure(error) = completion {
+                        print("❌ Reject request failed for ID \(requestId): \(error)")
+                    } else {
+                        print("✅ Reject request completed successfully for ID \(requestId)")
+                    }
+                },
+                receiveCancel: {
+                    print("🚫 Reject request was cancelled for ID \(requestId)")
+                }
+            )
+            .eraseToAnyPublisher()
     }
+
     
-    // Update user profile - fixed to use proper endpoint format from API docs
+    // Update user profile using the wrapper approach and PATCH method
     func updateProfile(name: String, bio: String?, isPrivate: Bool, profileImage: Data?) -> AnyPublisher<User, NetworkError> {
         guard let currentUser = AuthManager.shared.currentUser else {
             return Fail(error: NetworkError.unauthorized).eraseToAnyPublisher()
         }
-        
-        // Build parameters
         var parameters: [String: Any] = [
             "name": name,
             "isPrivate": isPrivate
         ]
-        
         if let bio = bio {
             parameters["bio"] = bio
         }
         
-        // Choose appropriate publisher based on whether we have an image
-        let publisher: AnyPublisher<ProfileUpdateResponse, NetworkError>
-        
-        // Choose between multipart for images or regular JSON for text-only
+        // Use PATCH for profile update with image; explicitly use HTTPMethod.patch
+        let publisher: AnyPublisher<ProfileUpdateResponseWrapper, NetworkError>
         if let profileImage = profileImage {
             publisher = apiService.uploadMultipart(
                 endpoint: "/user/profile",
+                method: HTTPMethod.patch,
                 parameters: parameters,
                 imageData: [profileImage],
                 imageFieldName: "photo"
@@ -156,13 +155,13 @@ class UserAPI {
             )
         }
         
-        // Now map the response to a User object
         return publisher
-            .map { response -> User in
+            .map { wrapper -> User in
+                let response = wrapper.user
                 return User(
                     id: response.id,
                     username: response.username,
-                    displayName: response.name,  // Note: Server now uses "name" field
+                    displayName: response.name,   // API returns the display name in "name"
                     email: response.email,
                     bio: response.bio,
                     photo: response.photo,
@@ -177,8 +176,16 @@ class UserAPI {
             }
             .eraseToAnyPublisher()
     }
-
-    // Special response structure for profile updates that matches the actual API response
+    
+    // MARK: - Response Models for Profile Update
+    
+    // Wrapper for the profile update response matching the nested API JSON.
+    struct ProfileUpdateResponseWrapper: Codable {
+        let success: Bool
+        let user: ProfileUpdateResponse
+    }
+    
+    // Response structure for profile updates matching the API's response.
     struct ProfileUpdateResponse: Codable {
         let id: Int
         let username: String
@@ -192,47 +199,30 @@ class UserAPI {
         let emailVerified: Bool?
         let role: String?
         
-        // Ignore these security-sensitive fields during decoding
         private enum CodingKeys: String, CodingKey {
             case id, username, email, name, bio, photo, followerCount, followingCount, isPrivate, emailVerified, role
-            // Explicitly exclude "password", "verificationToken", "resetPasswordToken", "resetPasswordExpires"
         }
     }
 }
 
-// FollowResponse struct with improved handling of different response formats
+// MARK: - FollowResponse Struct
+
+// Definition of FollowResponse so that it is in scope.
+// This struct handles decoding various formats of follow response from the API.
 struct FollowResponse: Codable {
-    var success: Bool = true  // Default to true
+    var success: Bool = true
     var message: String?
     
-    // Custom initializer to handle different API response formats
     init(from decoder: Decoder) throws {
-        let container: KeyedDecodingContainer<CodingKeys>
-        
-        do {
-            container = try decoder.container(keyedBy: CodingKeys.self)
-            success = try container.decodeIfPresent(Bool.self, forKey: .success) ?? true
-            message = try container.decodeIfPresent(String.self, forKey: .message)
-        } catch {
-            // For plain text responses like "OK"
-            let singleValueContainer = try? decoder.singleValueContainer()
-            if let stringValue = try? singleValueContainer?.decode(String.self) {
-                message = stringValue
-                success = true
-            }
-        }
-        
-        // Set success to true if we have a message about follow request
-        if message?.contains("Follow request sent") == true {
-            success = true
-        }
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        success = try container.decodeIfPresent(Bool.self, forKey: .success) ?? true
+        message = try container.decodeIfPresent(String.self, forKey: .message)
     }
     
     enum CodingKeys: String, CodingKey {
         case success, message
     }
     
-    // Regular initializer for fallbacks
     init(success: Bool = true, message: String? = nil) {
         self.success = success
         self.message = message
