@@ -68,9 +68,10 @@ struct FollowRequestRowView: View {
                 HStack(spacing: 8) {
                     // Put Accept button first
                     Button {
+                        print("🟢 ACCEPT BUTTON TAPPED for request ID: \(request.id)")
                         onAccept(request.id)
                     } label: {
-                        Text("Accept")  // Remove the hyphenation for clarity
+                        Text("Accept")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .frame(width: 70, height: 36)
@@ -81,9 +82,10 @@ struct FollowRequestRowView: View {
                     
                     // Put Reject button second
                     Button {
+                        print("🔴 REJECT BUTTON TAPPED for request ID: \(request.id)")
                         onReject(request.id)
                     } label: {
-                        Text("Reject")  // Remove the hyphenation for clarity
+                        Text("Reject")
                             .font(.subheadline)
                             .fontWeight(.medium)
                             .frame(width: 70, height: 36)

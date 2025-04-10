@@ -372,7 +372,11 @@ class ProfileViewModel: ObservableObject {
             followRequests.remove(at: index)
         }
         
-        print("📡 Rejecting follow request ID \(requestId)")
+        print("❌ REJECT_REQUEST: Explicitly rejecting follow request ID \(requestId)")
+        
+        // Log more details for debugging
+        let userId = followRequests.first(where: { $0.id == requestId })?.follower.id
+        print("❌ REJECT_REQUEST: Request from user ID: \(userId ?? -1)")
         
         UserAPI.shared.rejectFollowRequest(requestId: requestId)
             .receive(on: DispatchQueue.main)
@@ -381,11 +385,11 @@ class ProfileViewModel: ObservableObject {
                 
                 switch completionStatus {
                 case .finished:
-                    print("✅ Reject request completed successfully")
+                    print("❌ REJECT_REQUEST: Completed successfully")
                     // Don't call completion here - we handle it in receiveValue
                 case .failure(let err):
                     self.error = err.localizedDescription
-                    print("❌ Failed to reject follow request: \(err.localizedDescription)")
+                    print("❌ REJECT_REQUEST: Failed: \(err.localizedDescription)")
                     completion(false)
                 }
             } receiveValue: { response in
