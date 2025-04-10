@@ -91,33 +91,37 @@ class UserAPI {
             .eraseToAnyPublisher()
     }
     
-    // Reject follow request - using the new endpoint format
+    // Reject follow request - using the new endpoint format with explicit debug logging
     func rejectFollowRequest(requestId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        print("❌ STARTING Reject follow request ID \(requestId)")
+        print("❌ REJECT: Starting reject follow request ID \(requestId)")
+        
+        // Log the full API endpoint URL for debugging
+        let endpoint = "/follow-requests/\(requestId)/reject"
+        print("❌ REJECT: Using endpoint \(endpoint)")
         
         // Using explicit typing for the publisher
         let publisher: AnyPublisher<FollowResponse, NetworkError> = apiService.request(
-            endpoint: "/follow-requests/\(requestId)/reject",
+            endpoint: endpoint,
             method: .post
         )
         
         return publisher
             .handleEvents(
                 receiveSubscription: { _ in
-                    print("🔶 Reject request subscribed for ID \(requestId)")
+                    print("❌ REJECT: Request subscribed for ID \(requestId)")
                 },
                 receiveOutput: { response in
-                    print("✅ Reject request succeeded for ID \(requestId): \(response)")
+                    print("❌ REJECT: Request succeeded for ID \(requestId): \(response)")
                 },
                 receiveCompletion: { completion in
                     if case let .failure(error) = completion {
-                        print("❌ Reject request failed for ID \(requestId): \(error)")
+                        print("❌ REJECT: Request failed for ID \(requestId): \(error)")
                     } else {
-                        print("✅ Reject request completed successfully for ID \(requestId)")
+                        print("❌ REJECT: Request completed successfully for ID \(requestId)")
                     }
                 },
                 receiveCancel: {
-                    print("🚫 Reject request was cancelled for ID \(requestId)")
+                    print("❌ REJECT: Request was cancelled for ID \(requestId)")
                 }
             )
             .eraseToAnyPublisher()
