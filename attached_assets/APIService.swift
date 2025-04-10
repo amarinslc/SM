@@ -273,14 +273,27 @@ class APIService {
                     if data.count == 0 {
                         if Bool.self == T.self || Optional<Bool>.self == T.self {
                             // For endpoints that return nothing but success/failure
+                            print("✅ Empty response handled as success (Bool)")
                             return Just(true as! T)
                                 .setFailureType(to: NetworkError.self)
                                 .eraseToAnyPublisher()
                         } else if T.self == FollowResponse.self {
                             // For follow endpoints that might return empty responses
+                            print("✅ Empty response handled as success (FollowResponse)")
                             return Just(FollowResponse(success: true) as! T)
                                 .setFailureType(to: NetworkError.self)
                                 .eraseToAnyPublisher()
+                        } else {
+                            // Handle any other type that might receive empty response
+                            print("⚠️ Received empty response for type \(T.self) - attempting best effort handling")
+                            // Try to create a default instance if it's a decodable type with empty initializer
+                            if let decodableType = T.self as? Decodable.Type,
+                               let emptyInit = decodableType as? EmptyInitializable.Type,
+                               let instance = emptyInit.createEmpty() as? T {
+                                return Just(instance)
+                                    .setFailureType(to: NetworkError.self)
+                                    .eraseToAnyPublisher()
+                            }
                         }
                     }
                     
@@ -580,8 +593,87 @@ class APIService {
     
 
     
-    // Empty response struct for handling plain text or empty responses
-struct EmptyResponse: Codable {
+// Add JSONDecoder extension for consistent date formatting
+extension JSONDecoder {
+    static var defaultDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        
+        // Configure date decoding strategy to handle multiple formats
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+        
+        // Define multiple date formats to try
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Try multiple date formats
+            let formats = [
+                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
+                "yyyy-MM-dd'T'HH:mm:ssZ",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd"
+            ]
+            
+            for format in formats {
+                dateFormatter.dateFormat = format
+                if let date = dateFormatter.date(from: dateString) {
+                    return date
+                }
+            }
+            
+            // If none of the formats match, throw an error
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode date string \(dateString)"
+            )
+        }
+        
+        return decoder
+    }
+}
+
+// API Error model for decoding error responses
+struct APIError: Codable, Error {
+    var message: String
+    var error: String?
+    
+    // Handle multiple error formats from the server
+    enum CodingKeys: String, CodingKey {
+        case message, error
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        
+        // Try to decode error message with different field names
+        if let message = try? container.decode(String.self, forKey: .message) {
+            self.message = message
+        } else if let error = try? container.decode(String.self, forKey: .error) {
+            self.message = error
+            self.error = error
+        } else {
+            // Fallback for completely unknown format
+            self.message = "Unknown server error"
+            self.error = nil
+        }
+    }
+}
+
+// Protocol for types that can be created with an empty initializer
+protocol EmptyInitializable {
+    static func createEmpty() -> Any
+}
+
+// Make FollowResponse conform to EmptyInitializable
+extension FollowResponse: EmptyInitializable {
+    static func createEmpty() -> Any {
+        return FollowResponse(success: true)
+    }
+}
+
+// Empty response struct for handling plain text or empty responses
+struct EmptyResponse: Codable, EmptyInitializable {
     var success: Bool = true
     var message: String?
     
@@ -593,6 +685,10 @@ struct EmptyResponse: Codable {
     init(message: String) {
         self.success = true
         self.message = message
+    }
+    
+    static func createEmpty() -> Any {
+        return EmptyResponse()
     }
     
     init(success: Bool = true, message: String? = nil) {
