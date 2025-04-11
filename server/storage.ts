@@ -1,5 +1,5 @@
 import session from "express-session";
-import { users, type User, type InsertUser, Post, Comment, comments, follows, posts } from "@shared/schema";
+import { users, type User, type InsertUser, Post, Comment, comments, follows, posts, PrivacySettings, privacySettingsSchema } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, inArray, or, sql } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
@@ -7,12 +7,14 @@ import { pool } from "./db";
 import { Resend } from 'resend';
 import { randomBytes } from 'crypto';
 import { promisify } from 'util';
+import { comparePasswords } from "./auth";
 
 /**
  * Sanitize user data by removing sensitive fields before sending to client
  * @param user User object from database
  * @returns Sanitized user object without sensitive information
  */
+// The SanitizedUser type should remove sensitive fields but keep all other user properties
 export type SanitizedUser = Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'>;
 
 export function sanitizeUser(user: User): SanitizedUser;
@@ -33,7 +35,8 @@ export function sanitizeUser(user: User | undefined): SanitizedUser | undefined 
     followingCount: user.followingCount,
     isPrivate: user.isPrivate,
     emailVerified: user.emailVerified,
-    role: user.role
+    role: user.role,
+    privacySettings: user.privacySettings || privacySettingsSchema.parse({})
   };
   
   return sanitizedUser;
@@ -97,6 +100,11 @@ export interface IStorage {
   sendPasswordResetEmail(email: string): Promise<void>;
   resetPassword(token: string, newPassword: string): Promise<boolean>;
   
+  // Privacy and account management
+  getPrivacySettings(userId: number): Promise<PrivacySettings>;
+  updatePrivacySettings(userId: number, settings: PrivacySettings): Promise<PrivacySettings>;
+  deleteUserAccount(userId: number, password: string): Promise<boolean>;
+  
   // Special operations
   getFullUserData(id: number): Promise<Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined>;
   searchUsers(query: string): Promise<SanitizedUser[]>;
@@ -124,6 +132,75 @@ export class DatabaseStorage implements IStorage {
       // Error handling - don't crash on session store errors
       errorLog: (err) => console.error('Session store error:', err),
     });
+  }
+  
+  // Get user privacy settings
+  async getPrivacySettings(userId: number): Promise<PrivacySettings> {
+    const [user] = await db
+      .select({ privacySettings: users.privacySettings })
+      .from(users)
+      .where(eq(users.id, userId));
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    // Set default privacy settings if not set
+    if (!user.privacySettings) {
+      const defaultSettings = privacySettingsSchema.parse({});
+      return defaultSettings;
+    }
+    
+    // Validate and return the privacy settings
+    return privacySettingsSchema.parse(user.privacySettings);
+  }
+  
+  // Update user privacy settings
+  async updatePrivacySettings(userId: number, settings: PrivacySettings): Promise<PrivacySettings> {
+    // Validate settings with Zod schema
+    const validatedSettings = privacySettingsSchema.parse(settings);
+    
+    // Update the user's privacy settings
+    const [updatedUser] = await db
+      .update(users)
+      .set({ privacySettings: validatedSettings })
+      .where(eq(users.id, userId))
+      .returning({ privacySettings: users.privacySettings });
+    
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+    
+    return validatedSettings;
+  }
+  
+  // Delete user account with password verification
+  async deleteUserAccount(userId: number, password: string): Promise<boolean> {
+    // Get user with password for verification
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+    
+    // Verify password
+    const passwordMatch = await comparePasswords(password, user.password);
+    if (!passwordMatch) {
+      throw new Error("Invalid password");
+    }
+    
+    // Prevent deleting admin users without special consideration
+    if (user.role === 'admin') {
+      throw new Error("Cannot delete admin account through this endpoint");
+    }
+    
+    // Delegate to the existing deleteUser method
+    await this.deleteUser(userId);
+    
+    return true;
   }
 
   async getUser(id: number): Promise<User | undefined> {

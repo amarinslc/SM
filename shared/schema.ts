@@ -17,6 +17,18 @@ export const users = pgTable("users", {
   resetPasswordToken: text("reset_password_token"),
   resetPasswordExpires: timestamp("reset_password_expires"),
   role: text("role").default("user"), // Available roles: "user", "admin"
+  privacySettings: jsonb("privacy_settings").default({
+    showEmail: false,
+    allowTagging: true,
+    allowDirectMessages: true,
+    activityVisibility: "followers", // public, followers, none
+    notificationPreferences: {
+      likes: true,
+      comments: true,
+      follows: true,
+      messages: true
+    }
+  }),
 });
 
 export const follows = pgTable("follows", {
@@ -56,7 +68,38 @@ export const insertUserSchema = z.object({
   path: ["confirmPassword"],
 });
 
+// Privacy settings schema for validation
+export const privacySettingsSchema = z.object({
+  showEmail: z.boolean().default(false),
+  allowTagging: z.boolean().default(true),
+  allowDirectMessages: z.boolean().default(true),
+  activityVisibility: z.enum(["public", "followers", "none"]).default("followers"),
+  notificationPreferences: z.object({
+    likes: z.boolean().default(true),
+    comments: z.boolean().default(true),
+    follows: z.boolean().default(true),
+    messages: z.boolean().default(true)
+  }).default({
+    likes: true,
+    comments: true,
+    follows: true,
+    messages: true
+  })
+}).default({
+  showEmail: false,
+  allowTagging: true,
+  allowDirectMessages: true,
+  activityVisibility: "followers",
+  notificationPreferences: {
+    likes: true,
+    comments: true,
+    follows: true,
+    messages: true
+  }
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
