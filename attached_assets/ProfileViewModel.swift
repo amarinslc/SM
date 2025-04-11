@@ -463,4 +463,83 @@ class ProfileViewModel: ObservableObject {
             }
             .store(in: &cancellables)
     }
+    
+    // MARK: - Privacy Settings and Account Management
+    
+    @Published var privacySettings: PrivacySettings?
+    @Published var isLoadingPrivacySettings = false
+    
+    // Fetch the user's privacy settings
+    func fetchPrivacySettings() {
+        isLoadingPrivacySettings = true
+        error = nil
+        
+        UserAPI.shared.getPrivacySettings()
+            .receive(on: DispatchQueue.main)
+            .sink { completion in
+                self.isLoadingPrivacySettings = false
+                if case let .failure(err) = completion {
+                    self.error = err.localizedDescription
+                    print("❌ Failed to fetch privacy settings: \(err.localizedDescription)")
+                }
+            } receiveValue: { settings in
+                self.privacySettings = settings
+                print("✅ Received privacy settings: \(settings)")
+            }
+            .store(in: &cancellables)
+    }
+    
+    // Update user's privacy settings
+    func updatePrivacySettings(settings: PrivacySettings, completion: @escaping (Bool) -> Void) {
+        isLoadingPrivacySettings = true
+        error = nil
+        
+        UserAPI.shared.updatePrivacySettings(settings: settings)
+            .receive(on: DispatchQueue.main)
+            .sink { completionStatus in
+                self.isLoadingPrivacySettings = false
+                if case let .failure(err) = completionStatus {
+                    self.error = err.localizedDescription
+                    print("❌ Failed to update privacy settings: \(err.localizedDescription)")
+                    completion(false)
+                }
+            } receiveValue: { updatedSettings in
+                self.privacySettings = updatedSettings
+                print("✅ Privacy settings updated successfully")
+                completion(true)
+            }
+            .store(in: &cancellables)
+    }
+    
+    // Delete user account
+    @Published var isDeletingAccount = false
+    
+    func deleteAccount(password: String, completion: @escaping (Bool, String?) -> Void) {
+        isDeletingAccount = true
+        error = nil
+        
+        UserAPI.shared.deleteAccount(password: password)
+            .receive(on: DispatchQueue.main)
+            .sink { completionStatus in
+                self.isDeletingAccount = false
+                if case let .failure(err) = completionStatus {
+                    self.error = err.localizedDescription
+                    print("❌ Account deletion failed: \(err.localizedDescription)")
+                    completion(false, err.localizedDescription)
+                }
+            } receiveValue: { response in
+                self.isDeletingAccount = false
+                if response.success {
+                    print("✅ Account deleted successfully")
+                    // Trigger logout
+                    AuthManager.shared.logout()
+                    completion(true, "Your account has been deleted successfully.")
+                } else {
+                    print("⚠️ Account deletion response indicates failure: \(response.message ?? "Unknown error")")
+                    self.error = response.message
+                    completion(false, response.message)
+                }
+            }
+            .store(in: &cancellables)
+    }
 }
