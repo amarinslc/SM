@@ -126,6 +126,65 @@ class UserAPI {
             )
             .eraseToAnyPublisher()
     }
+    
+    // MARK: - Privacy Settings
+    
+    // Get user's privacy settings
+    func getPrivacySettings() -> AnyPublisher<PrivacySettings, NetworkError> {
+        print("🔒 Fetching privacy settings")
+        return apiService.request(endpoint: "/privacy", method: .get)
+            .handleEvents(
+                receiveCompletion: { completion in
+                    if case let .failure(error) = completion {
+                        print("❌ Failed to fetch privacy settings: \(error)")
+                    }
+                }
+            )
+            .eraseToAnyPublisher()
+    }
+    
+    // Update user's privacy settings
+    func updatePrivacySettings(settings: PrivacySettings) -> AnyPublisher<PrivacySettings, NetworkError> {
+        print("🔒 Updating privacy settings")
+        return apiService.request(
+            endpoint: "/privacy",
+            method: .patch,
+            parameters: settings.asDictionary()
+        )
+        .handleEvents(
+            receiveCompletion: { completion in
+                if case let .failure(error) = completion {
+                    print("❌ Failed to update privacy settings: \(error)")
+                }
+            }
+        )
+        .eraseToAnyPublisher()
+    }
+    
+    // MARK: - Account Management
+    
+    // Delete user account
+    func deleteAccount(password: String) -> AnyPublisher<FollowResponse, NetworkError> {
+        print("⚠️ Deleting user account")
+        return apiService.request(
+            endpoint: "/account/delete",
+            method: .post,
+            parameters: ["password": password]
+        )
+        .handleEvents(
+            receiveOutput: { response in
+                print("✅ Account deletion request succeeded: \(response)")
+                // Clear auth credentials on successful deletion
+                AuthManager.shared.logout()
+            },
+            receiveCompletion: { completion in
+                if case let .failure(error) = completion {
+                    print("❌ Account deletion failed: \(error)")
+                }
+            }
+        )
+        .eraseToAnyPublisher()
+    }
 
     
     // Update user profile using the wrapper approach and PATCH method
@@ -230,5 +289,66 @@ struct FollowResponse: Codable {
     init(success: Bool = true, message: String? = nil) {
         self.success = success
         self.message = message
+    }
+}
+
+// MARK: - Privacy Settings Models
+
+// Definition of NotificationPreferences
+struct NotificationPreferences: Codable {
+    var likes: Bool
+    var comments: Bool
+    var follows: Bool
+    var messages: Bool
+    
+    func asDictionary() -> [String: Any] {
+        return [
+            "likes": likes,
+            "comments": comments,
+            "follows": follows,
+            "messages": messages
+        ]
+    }
+    
+    init(likes: Bool = true, comments: Bool = true, follows: Bool = true, messages: Bool = true) {
+        self.likes = likes
+        self.comments = comments
+        self.follows = follows
+        self.messages = messages
+    }
+}
+
+// Definition of PrivacySettings
+struct PrivacySettings: Codable {
+    var showEmail: Bool
+    var allowTagging: Bool
+    var allowDirectMessages: Bool
+    var activityVisibility: String
+    var notificationPreferences: NotificationPreferences
+    
+    enum CodingKeys: String, CodingKey {
+        case showEmail, allowTagging, allowDirectMessages, activityVisibility, notificationPreferences
+    }
+    
+    func asDictionary() -> [String: Any] {
+        return [
+            "showEmail": showEmail,
+            "allowTagging": allowTagging,
+            "allowDirectMessages": allowDirectMessages,
+            "activityVisibility": activityVisibility,
+            "notificationPreferences": notificationPreferences.asDictionary()
+        ]
+    }
+    
+    init(showEmail: Bool = false, 
+         allowTagging: Bool = true, 
+         allowDirectMessages: Bool = true, 
+         activityVisibility: String = "followers",
+         notificationPreferences: NotificationPreferences = NotificationPreferences()) {
+        self.showEmail = showEmail
+        self.allowTagging = allowTagging
+        self.allowDirectMessages = allowDirectMessages
+        self.activityVisibility = activityVisibility
+        self.notificationPreferences = notificationPreferences
     }
 }
