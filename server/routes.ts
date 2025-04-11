@@ -451,6 +451,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ error: (error as Error).message });
     }
   });
+  
+  // Privacy Settings endpoints
+  
+  // Get user's privacy settings
+  app.get("/api/user/privacy-settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const privacySettings = await storage.getPrivacySettings(req.user!.id);
+      res.status(200).json(privacySettings);
+    } catch (error) {
+      console.error("Error getting privacy settings:", error);
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+  
+  // Update user's privacy settings
+  app.patch("/api/user/privacy-settings", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      // Validate and update privacy settings
+      const updatedSettings = await storage.updatePrivacySettings(
+        req.user!.id, 
+        req.body
+      );
+      
+      res.status(200).json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating privacy settings:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+  
+  // Account deletion endpoint
+  app.delete("/api/user/delete", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { password } = req.body;
+      
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+      
+      // Attempt to delete the account with password verification
+      const result = await storage.deleteUserAccount(req.user!.id, password);
+      
+      if (result) {
+        // Log the user out after account deletion
+        req.logout((err) => {
+          if (err) {
+            console.error("Error logging out after account deletion:", err);
+          }
+          res.status(200).json({ message: "Account deleted successfully" });
+        });
+      } else {
+        res.status(400).json({ error: "Failed to delete account" });
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
 
   app.post("/api/follow-requests/:id/reject", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -459,6 +523,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.sendStatus(200);
     } catch (error) {
       console.error("Error rejecting request:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+  
+  // iOS compatible routes with different naming conventions
+  app.get("/api/privacy", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const privacySettings = await storage.getPrivacySettings(req.user!.id);
+      res.status(200).json(privacySettings);
+    } catch (error) {
+      console.error("Error getting privacy settings:", error);
+      res.status(500).json({ error: (error as Error).message });
+    }
+  });
+  
+  app.patch("/api/privacy", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const updatedSettings = await storage.updatePrivacySettings(
+        req.user!.id, 
+        req.body
+      );
+      
+      res.status(200).json(updatedSettings);
+    } catch (error) {
+      console.error("Error updating privacy settings:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
+  
+  app.post("/api/account/delete", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { password } = req.body;
+      
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+      
+      const result = await storage.deleteUserAccount(req.user!.id, password);
+      
+      if (result) {
+        req.logout((err) => {
+          if (err) {
+            console.error("Error logging out after account deletion:", err);
+          }
+          res.status(200).json({ message: "Account deleted successfully" });
+        });
+      } else {
+        res.status(400).json({ error: "Failed to delete account" });
+      }
+    } catch (error) {
+      console.error("Error deleting account:", error);
       res.status(400).json({ error: (error as Error).message });
     }
   });
