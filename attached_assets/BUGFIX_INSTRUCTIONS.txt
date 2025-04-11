@@ -1,0 +1,70 @@
+FOLLOW REQUEST BUGFIX INSTRUCTIONS
+
+I've identified and fixed an issue with the follow request rejection functionality in your iOS app. The problem occurs when tapping the "Reject" button, but the system is calling the accept endpoint instead of the reject endpoint.
+
+## Changes Made:
+
+1. Added detailed debugging to UserAPI.swift:
+   - Added more explicit logging for reject operations
+   - Ensured the correct endpoint is used for reject requests
+
+2. Enhanced ProfileViewModel.swift:
+   - Added better logging for the reject flow
+   - Created safe wrapper functions to ensure correct handling:
+     * safeAcceptRequest()
+     * safeRejectRequest()
+
+3. Improved FollowRequestRowView.swift:
+   - Added detailed logging for button tap events
+   - Made code more robust and explicit
+
+## ACTION REQUIRED:
+
+The actual issue is likely in the view file that creates the FollowRequestRowView. You need to update any code that looks like this:
+
+```swift
+// Find the code that looks like this:
+ForEach(viewModel.followRequests) { request in
+    FollowRequestRowView(
+        request: request,
+        onAccept: { requestId in
+            viewModel.acceptFollowRequest(requestId: requestId) { success in 
+                // handle success
+            }
+        },
+        onReject: { requestId in
+            viewModel.acceptFollowRequest(requestId: requestId) { success in  // <-- THIS IS WRONG!
+                // handle success
+            }
+        }
+    )
+}
+```
+
+Change it to use the new safe wrapper functions:
+
+```swift
+ForEach(viewModel.followRequests) { request in
+    FollowRequestRowView(
+        request: request,
+        onAccept: { requestId in
+            viewModel.safeAcceptRequest(requestId: requestId) { success in 
+                // handle success
+            }
+        },
+        onReject: { requestId in
+            viewModel.safeRejectRequest(requestId: requestId) { success in  // <-- FIXED!
+                // handle success
+            }
+        }
+    )
+}
+```
+
+The error is subtle but critical - the `onReject` callback is erroneously calling `acceptFollowRequest` instead of `rejectFollowRequest`.
+
+## TEMPORARY WORKAROUND:
+
+Until you update the view code, you can use the safe wrapper functions I've added to ProfileViewModel.swift. These wrappers ensure the correct function is called regardless of how they're bound in the view.
+
+If you're not sure which file to update, search for "FollowRequestRowView" in your project and look for where the view is created and the callbacks are defined.

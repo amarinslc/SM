@@ -411,6 +411,21 @@ class ProfileViewModel: ObservableObject {
     
     // MARK: - Follow Requests Management
     
+    // BUGFIX: Add wrapper functions to ensure correct handling even if view bindings are incorrect
+    
+    // Safe wrapper function for accepting follow requests
+    // This ensures we're ALWAYS calling accept and never reject
+    func safeAcceptRequest(requestId: Int, completion: @escaping (Bool) -> Void) {
+        print("🔵 SAFE_ACCEPT: Called for request ID \(requestId)")
+        acceptFollowRequest(requestId: requestId, completion: completion)
+    }
+    
+    // Safe wrapper function for rejecting follow requests
+    // This ensures we're ALWAYS calling reject and never accept
+    func safeRejectRequest(requestId: Int, completion: @escaping (Bool) -> Void) {
+        print("🔵 SAFE_REJECT: Called for request ID \(requestId)")
+        rejectFollowRequest(requestId: requestId, completion: completion)
+    }
     
     // In ProfileViewModel.swift, update the fetchOutgoingRequests method
 
