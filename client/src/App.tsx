@@ -12,6 +12,7 @@ import AdminPage from "@/pages/admin-page";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsAndConditions from "@/pages/terms-and-conditions";
 import { ProtectedRoute, AdminRoute } from "./lib/protected-route";
+import { Footer } from "./components/footer";
 
 function Router() {
   return (
@@ -34,7 +35,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
+        <div className="flex min-h-screen flex-col">
+          <main className="flex-1">
+            <Router />
+          </main>
+          <Footer />
+        </div>
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>

@@ -18,14 +18,14 @@ export function Footer() {
           
           <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
             <Link href="/privacypolicy">
-              <a className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                 Privacy Policy
-              </a>
+              </span>
             </Link>
             <Link href="/termsandconditions">
-              <a className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              <span className="text-sm text-muted-foreground hover:text-primary transition-colors cursor-pointer">
                 Terms and Conditions
-              </a>
+              </span>
             </Link>
             <a 
               href="mailto:dunbarsocialapp@gmail.com" 
