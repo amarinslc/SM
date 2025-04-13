@@ -9,6 +9,8 @@ import AuthPage from "@/pages/auth-page";
 import ProfilePage from "@/pages/profile";
 import VerifyEmailPage from "@/pages/verify-email";
 import AdminPage from "@/pages/admin-page";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import TermsAndConditions from "@/pages/terms-and-conditions";
 import { ProtectedRoute, AdminRoute } from "./lib/protected-route";
 
 function Router() {
@@ -20,6 +22,9 @@ function Router() {
       <AdminRoute path="/admin" component={AdminPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/verify-email" component={VerifyEmailPage} />
+      {/* Public static pages - accessible without login */}
+      <Route path="/privacypolicy" component={PrivacyPolicy} />
+      <Route path="/termsandconditions" component={TermsAndConditions} />
       <Route component={NotFound} />
     </Switch>
   );

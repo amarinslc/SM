@@ -1,0 +1,72 @@
+Dunbar Social Terms and Conditions
+Last Updated: April 13, 2025
+By accessing or using the Dunbar Social mobile application and its associated services (collectively, the “Service”), you agree to be bound by these Terms and Conditions (“Terms”). If you do not agree to these Terms, you must not access or use the Service.
+
+1. Acceptance of Terms
+By downloading, accessing, or using Dunbar Social, you acknowledge that you have read, understood, and agree to comply with these Terms and any additional guidelines or rules applicable to the Service.
+
+2. Changes to Terms
+Dunbar Social reserves the right to modify or update these Terms at any time in its sole discretion. Updated Terms will be effective immediately upon posting within the Service. Your continued use of the Service following any changes constitutes acceptance of the revised Terms. It is your responsibility to review these Terms periodically.
+
+3. Description of the Service
+Dunbar Social is a social media platform that enables users to create profiles, connect with others, and share various types of content, including but not limited to photos, videos, and text posts. A distinctive feature of the Service is that it caps both follower and following accounts at a maximum of 150 per user.
+
+4. Non-Affiliation and Non-Endorsement of Robin Dunbar
+Non-Affiliation: The Service name “Dunbar Social” is a reference to the sociological principles popularized by Robin Dunbar, but the Service is independently operated and maintained.
+No Endorsement: Robin Dunbar is not affiliated with, does not represent, and has not endorsed Dunbar Social or its content, features, or policies in any way.
+
+5. User Account, Registration, and Security
+Account Creation: To access certain features of the Service, you may be required to register for an account. During registration, you agree to provide accurate, current, and complete information (such as your name, email address, and birthdate).
+Account Security: You are responsible for maintaining the confidentiality of your account credentials and agree to immediately notify Dunbar Social of any unauthorized use of your account or any other breach of security.
+Eligibility: You must be at least 13 years old (or older if required by local law) to create an account or use the Service. By registering, you represent and warrant that you meet the minimum age requirements.
+
+6. Content Standards and Prohibited Content
+User-Generated Content: You are solely responsible for the content you post on the Service. Although Dunbar Social does not claim ownership of user-generated content, by submitting content you grant the Service a worldwide, non-exclusive, royalty-free license to use, reproduce, modify, distribute, and display such content.
+Prohibited Content: You agree not to post or transmit content that:
+Contains hate speech, discriminatory language, or incites violence or hatred against any individual or group.
+Encourages or facilitates criminal activity, illegal behavior, or any conduct that poses a risk to others’ safety.
+Is harmful, abusive, or promotes self-harm, harassment, bullying, or defamation.
+Includes any content that is pornographic, sexually explicit (unless permitted in limited contexts by the Service guidelines), or otherwise objectionable under local laws.
+Enforcement: Violations of these standards may result in content removal, suspension of your account, or other legal actions at the sole discretion of Dunbar Social.
+
+7. Follower and Following Limits
+Limits: Dunbar Social enforces a cap of 150 on both the number of accounts you can follow and the number of accounts that can follow you. This limitation is designed to promote more meaningful connections among users.
+Modifications: Dunbar Social reserves the right to adjust these limits at its discretion. When possible, any changes affecting your current network relationships will be communicated in advance.
+
+8. Intellectual Property
+User Content Ownership: You retain all rights to the content you create and share on the Service. By posting content, you grant Dunbar Social a license to use, reproduce, and display your content as needed to operate the Service.
+Service Intellectual Property: All design, technology, and intellectual property related to the Service (including but not limited to images, graphics, software, and trademarks) are owned by Dunbar Social or its licensors. You agree not to reproduce, duplicate, or copy any portion of the Service without express written permission.
+
+9. Data Collection and Privacy
+Data Collected: To provide and improve our Service, Dunbar Social may collect personal information, such as your name, email address, birthdate, and the content you upload (e.g., videos, photos, text posts).
+Usage of Data: Your data is used to personalize your experience, facilitate communication between users, provide customer support, and improve the Service.
+Privacy Policy: The collection and use of personal information are governed by our Privacy Policy, which is incorporated into these Terms. By using the Service, you consent to the practices described in the Privacy Policy.
+
+10. Prohibited Activities
+You agree not to engage in any activities that:
+Compromise the security or functionality of the Service.
+Infringe upon the intellectual property or other rights of third parties.
+Disrupt or interfere with the use of the Service by other users.
+Utilize automated systems (such as bots, crawlers, or scrapers) without explicit permission from Dunbar Social.
+Violate any local, national, or international laws and regulations, including laws related to hate speech, criminal activity, and harmful conduct.
+
+11. Termination
+Dunbar Social reserves the right, at its sole discretion, to suspend or terminate your account and your access to the Service, with or without notice, for any reason, including but not limited to breaches of these Terms. Upon termination, your right to use the Service ceases immediately.
+
+12. Disclaimers and Limitation of Liability
+No Warranty: The Service is provided on an “as is” and “as available” basis without warranties of any kind, whether express, implied, or statutory. Dunbar Social does not guarantee uninterrupted, secure, or error-free access to the Service.
+Limitation of Liability: In no event shall Dunbar Social be liable for any indirect, incidental, special, consequential, or punitive damages arising out of your use of or inability to use the Service, even if informed of the possibility of such damages.
+
+13. Indemnification
+You agree to indemnify, defend, and hold harmless Dunbar Social, its affiliates, directors, employees, and agents from and against any and all claims, losses, liabilities, damages, costs, or expenses (including reasonable attorneys’ fees) arising from your use of the Service or any violation of these Terms.
+
+14. Governing Law and Dispute Resolution
+Governing Law: These Terms and any disputes related to them shall be governed exclusively by the laws of the jurisdiction in which Dunbar Social operates, without regard to conflict of law provisions.
+Dispute Resolution: Any disputes arising from these Terms or the Service shall first be attempted to be resolved through good-faith negotiations. Failing resolution, disputes may be submitted to binding arbitration in accordance with applicable law.
+
+15. Contact Information
+If you have any questions, concerns, or feedback regarding these Terms or the Service, please contact us at:
+Email: dunbarsocialapp@gmail.com
+
+This document constitutes a binding agreement between you and Dunbar Social regarding your use of the Service. Please review these Terms periodically to stay informed of any changes.
+
