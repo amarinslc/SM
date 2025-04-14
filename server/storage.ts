@@ -36,6 +36,7 @@ export function sanitizeUser(user: User | undefined): SanitizedUser | undefined 
     isPrivate: user.isPrivate,
     emailVerified: user.emailVerified,
     role: user.role,
+    removedPostCount: user.removedPostCount || 0,
     privacySettings: user.privacySettings || privacySettingsSchema.parse({})
   };
   
@@ -88,9 +89,10 @@ export interface IStorage {
   deletePost(id: number): Promise<void>;
   
   // Post reporting operations
-  reportPost(postId: number, userId: number, reason?: string): Promise<boolean>;
+  reportPost(postId: number, userId: number, reason: string): Promise<boolean>;
   hasUserReportedPost(postId: number, userId: number): Promise<boolean>;
-  getReportedPosts(adminId: number): Promise<Post[]>;
+  getReportedPosts(adminId: number): Promise<any[]>;
+  reviewPost(postId: number, adminId: number, action: 'approve' | 'remove'): Promise<boolean>;
   
   // Follow request operations
   getPendingFollowRequests(userId: number): Promise<any[]>;
@@ -877,8 +879,8 @@ export class DatabaseStorage implements IStorage {
     return !!report;
   }
   
-  // Get all reported posts for admin review
-  async getReportedPosts(adminId: number): Promise<Post[]> {
+  // Get all reported posts for admin review with detailed reporting info
+  async getReportedPosts(adminId: number): Promise<any[]> {
     // Check if user is an admin
     const [admin] = await db
       .select()
@@ -894,12 +896,127 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Unauthorized: Only admins can access reported posts");
     }
     
-    // Get posts with at least one report, ordered by report count descending
-    return db
-      .select()
-      .from(posts)
-      .where(gt(posts.reportCount, 0))
-      .orderBy(desc(posts.reportCount));
+    // Get reported posts with their detailed report info and poster's name
+    const result = await db.execute(sql`
+      SELECT 
+        p.*,
+        json_agg(json_build_object(
+          'reason', pr.reason,
+          'status', pr.status,
+          'createdAt', pr.created_at,
+          'userId', pr.user_id
+        )) AS reports,
+        u.username, 
+        u.name
+      FROM posts p
+      JOIN post_reports pr ON p.id = pr.post_id
+      JOIN users u ON p.user_id = u.id
+      WHERE p.report_count > 0
+      GROUP BY p.id, u.username, u.name
+      ORDER BY p.is_priority_review DESC, p.report_count DESC
+    `);
+    
+    // Convert to array format
+    return result.rows as any[];
+  }
+  
+  // Admin method to approve or remove a reported post
+  async reviewPost(postId: number, adminId: number, action: 'approve' | 'remove'): Promise<boolean> {
+    try {
+      // Check if user is an admin
+      const [admin] = await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            eq(users.id, adminId),
+            eq(users.role, "admin")
+          )
+        );
+      
+      if (!admin) {
+        throw new Error("Unauthorized: Only admins can review posts");
+      }
+      
+      // Get the post to confirm it exists
+      const [post] = await db
+        .select()
+        .from(posts)
+        .where(eq(posts.id, postId));
+        
+      if (!post) {
+        throw new Error("Post not found");
+      }
+      
+      await db.transaction(async (tx) => {
+        if (action === 'approve') {
+          // Clear all reports and mark post as safe
+          await tx
+            .update(posts)
+            .set({
+              reportCount: 0,
+              isRemoved: false,
+              isPriorityReview: false
+            })
+            .where(eq(posts.id, postId));
+            
+          // Update all reports for this post
+          await tx
+            .update(postReports)
+            .set({
+              status: 'reviewed_ok',
+              reviewedBy: adminId,
+              reviewedAt: new Date()
+            })
+            .where(eq(postReports.postId, postId));
+        } else {
+          // Mark post as removed
+          await tx
+            .update(posts)
+            .set({
+              isRemoved: true,
+              isPriorityReview: false
+            })
+            .where(eq(posts.id, postId));
+            
+          // Update all reports for this post
+          await tx
+            .update(postReports)
+            .set({
+              status: 'removed',
+              reviewedBy: adminId,
+              reviewedAt: new Date()
+            })
+            .where(eq(postReports.postId, postId));
+            
+          // Increment user's removed post count
+          const [userInfo] = await tx
+            .select({ removedPostCount: users.removedPostCount, role: users.role })
+            .from(users)
+            .where(eq(users.id, post.userId));
+            
+          if (userInfo) {
+            const newCount = (userInfo.removedPostCount || 0) + 1;
+            
+            // Update the count
+            await tx.update(users)
+              .set({ removedPostCount: newCount })
+              .where(eq(users.id, post.userId));
+              
+            // If user has had 5+ posts removed, schedule account deletion
+            if (newCount >= 5 && userInfo.role !== 'admin') {
+              // Schedule deletion after transaction completes (unless admin)
+              setTimeout(() => this.deleteUser(post.userId), 100);
+            }
+          }
+        }
+      });
+      
+      return true;
+    } catch (error) {
+      console.error("Error reviewing post:", error);
+      return false;
+    }
   }
 
   async verifyEmail(token: string): Promise<boolean> {
