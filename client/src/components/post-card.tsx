@@ -9,9 +9,10 @@ import { CommentView } from "./comment";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Flag } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { ReportPostDialog } from "./report-post-dialog";
 
 interface PostCardProps {
   post: Post;
@@ -19,6 +20,7 @@ interface PostCardProps {
 
 export function PostCard({ post }: PostCardProps) {
   const [newComment, setNewComment] = useState("");
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
 
@@ -116,21 +118,32 @@ export function PostCard({ post }: PostCardProps) {
               : format(new Date(post.createdAt || new Date()), 'MMMM d, yyyy')}
           </span>
         </div>
-        {currentUser?.id === author.id && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto"
-            onClick={() => deletePostMutation.mutate()}
-            disabled={deletePostMutation.isPending}
-          >
-            {deletePostMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-4 w-4" />
-            )}
-          </Button>
-        )}
+        <div className="ml-auto flex gap-1">
+          {currentUser && currentUser.id !== author.id && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsReportDialogOpen(true)}
+              title="Report post"
+            >
+              <Flag className="h-4 w-4" />
+            </Button>
+          )}
+          {currentUser?.id === author.id && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => deletePostMutation.mutate()}
+              disabled={deletePostMutation.isPending}
+            >
+              {deletePostMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4" />
+              )}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <p className="whitespace-pre-wrap">{post.content}</p>
@@ -186,6 +199,13 @@ export function PostCard({ post }: PostCardProps) {
           </div>
         </form>
       </CardFooter>
+      {isReportDialogOpen && (
+        <ReportPostDialog
+          isOpen={isReportDialogOpen}
+          onClose={() => setIsReportDialogOpen(false)}
+          postId={post.id}
+        />
+      )}
     </Card>
   );
 }
