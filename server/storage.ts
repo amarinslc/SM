@@ -115,6 +115,7 @@ export interface IStorage {
   // Special operations
   getFullUserData(id: number): Promise<Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined>;
   searchUsers(query: string): Promise<SanitizedUser[]>;
+  getAllUsers(): Promise<SanitizedUser[]>;
   deleteUser(id: number): Promise<void>;
   getUserProfile(userId: number, viewerId?: number): Promise<UserProfileWithRelationship | undefined>;
   
@@ -1192,6 +1193,29 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Search error:", error);
       throw new Error("Failed to search users");
+    }
+  }
+  
+  async getAllUsers(): Promise<SanitizedUser[]> {
+    try {
+      const userResults = await db
+        .select()
+        .from(users)
+        .orderBy(users.username);
+      
+      // Sanitize all user data and ensure counts are valid numbers
+      const sanitizedResults = sanitizeUsers(userResults);
+      
+      return sanitizedResults.map(user => ({
+        ...user,
+        followerCount: user.followerCount ?? 0,
+        followingCount: user.followingCount ?? 0,
+        isPrivate: user.isPrivate ?? false,
+        removedPostCount: user.removedPostCount ?? 0
+      }));
+    } catch (error) {
+      console.error("Get all users error:", error);
+      throw new Error("Failed to retrieve users");
     }
   }
 

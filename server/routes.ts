@@ -1116,6 +1116,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Add route for admin to delete users
+  // Get all users for admin management
+  app.get("/api/admin/users", isAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Failed to get all users:", error);
+      res.status(500).json({ error: "Failed to retrieve users" });
+    }
+  });
+
   app.delete("/api/admin/users/:id", isAdmin, async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
