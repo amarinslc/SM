@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   resetPasswordToken: text("reset_password_token"),
   resetPasswordExpires: timestamp("reset_password_expires"),
   role: text("role").default("user"), // Available roles: "user", "admin"
+  removedPostCount: integer("removed_post_count").default(0), // Track number of posts removed for violations
   privacySettings: jsonb("privacy_settings").default({
     showEmail: false,
     allowTagging: true,
@@ -46,6 +47,7 @@ export const posts = pgTable("posts", {
   createdAt: timestamp("created_at").defaultNow(),
   reportCount: integer("report_count").default(0),
   isRemoved: boolean("is_removed").default(false),
+  isPriorityReview: boolean("is_priority_review").default(false),
 });
 
 export const comments = pgTable("comments", {
@@ -59,7 +61,10 @@ export const comments = pgTable("comments", {
 export const postReports = pgTable("post_reports", {
   postId: integer("post_id").notNull(),
   userId: integer("user_id").notNull(),
-  reason: text("reason").default("inappropriate"),
+  reason: text("reason").notNull(),
+  status: text("status").default("pending").notNull(), // 'pending', 'reviewed_ok', 'removed'
+  reviewedBy: integer("reviewed_by"), // admin user ID who reviewed the post
+  reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => {
   return {
@@ -83,6 +88,21 @@ export const insertUserSchema = z.object({
 });
 
 // Privacy settings schema for validation
+// Report reason schema with strict validation
+export const reportReasonEnum = z.enum([
+  "Hateful",
+  "Harmful_or_Abusive",
+  "Criminal_Activity",
+  "Sexually_Explicit"
+]);
+
+export type ReportReason = z.infer<typeof reportReasonEnum>;
+
+export const reportSchema = z.object({
+  postId: z.number(),
+  reason: reportReasonEnum
+});
+
 export const privacySettingsSchema = z.object({
   showEmail: z.boolean().default(false),
   allowTagging: z.boolean().default(true),

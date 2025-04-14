@@ -764,7 +764,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Report a post - returns true if post was auto-removed (3+ reports)
-  async reportPost(postId: number, userId: number, reason: string = "inappropriate"): Promise<boolean> {
+  async reportPost(postId: number, userId: number, reason: string): Promise<boolean> {
+    // Validate that the reason is one of our allowed reasons
+    const validReasons = ["Hateful", "Harmful_or_Abusive", "Criminal_Activity", "Sexually_Explicit"];
+    if (!validReasons.includes(reason)) {
+      throw new Error("Invalid report reason. Must be one of: Hateful, Harmful_or_Abusive, Criminal_Activity, Sexually_Explicit");
+    }
+
     // Check if post exists
     const [post] = await db.select().from(posts).where(eq(posts.id, postId));
     if (!post) {
@@ -784,7 +790,8 @@ export class DatabaseStorage implements IStorage {
       await tx.insert(postReports).values({
         postId,
         userId,
-        reason
+        reason,
+        status: 'pending'
       });
       
       // Increment the report count
@@ -801,13 +808,58 @@ export class DatabaseStorage implements IStorage {
       if (reportCount >= 3) {
         await tx
           .update(posts)
-          .set({ isRemoved: true })
+          .set({ 
+            isRemoved: true,
+            isPriorityReview: true // Mark for priority review
+          })
           .where(eq(posts.id, postId));
+        
         postRemoved = true;
+        
+        // Increment the user's removed post count
+        await this.incrementUserRemovedPostCount(tx, post.userId);
       }
     });
     
     return postRemoved;
+  }
+  
+  // Helper method to increment a user's removed post count
+  // If count reaches 5, delete the account
+  async incrementUserRemovedPostCount(tx: any, userId: number): Promise<void> {
+    try {
+      // Get current count
+      const [user] = await tx
+        .select({ removedPostCount: users.removedPostCount })
+        .from(users)
+        .where(eq(users.id, userId));
+      
+      if (!user) return;
+      
+      const newCount = (user.removedPostCount || 0) + 1;
+      
+      // Update the count
+      await tx
+        .update(users)
+        .set({ removedPostCount: newCount })
+        .where(eq(users.id, userId));
+      
+      // If user has had 5 or more posts removed, delete their account
+      // unless they are an admin
+      if (newCount >= 5) {
+        const [userToDelete] = await tx
+          .select({ role: users.role })
+          .from(users)
+          .where(eq(users.id, userId));
+          
+        if (userToDelete && userToDelete.role !== 'admin') {
+          // Mark for deletion after transaction completes
+          setTimeout(() => this.deleteUser(userId), 100);
+        }
+      }
+    } catch (err) {
+      console.error("Error incrementing user removed post count:", err);
+    }
   }
   
   // Check if a user has already reported a post
