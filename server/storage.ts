@@ -818,50 +818,31 @@ export class DatabaseStorage implements IStorage {
         
         postRemoved = true;
         
-        // Increment the user's removed post count
-        await this.incrementUserRemovedPostCount(tx, post.userId);
+        // Increment the user's removed post count and handle account deletion if needed
+        const [userInfo] = await tx
+          .select({ removedPostCount: users.removedPostCount, role: users.role })
+          .from(users)
+          .where(eq(users.id, post.userId));
+          
+        if (userInfo) {
+          const newCount = (userInfo.removedPostCount || 0) + 1;
+          
+          // Update the count
+          await tx.update(users)
+            .set({ removedPostCount: newCount })
+            .where(eq(users.id, post.userId));
+            
+          // If user has had 5+ posts removed, schedule account deletion
+          if (newCount >= 5 && userInfo.role !== 'admin') {
+            console.log(`User ${post.userId} has ${newCount} removed posts, scheduling account deletion`);
+            // Schedule deletion after transaction completes (unless admin)
+            setTimeout(() => this.deleteUser(post.userId), 100);
+          }
+        }
       }
     });
     
     return postRemoved;
-  }
-  
-  // Helper method to increment a user's removed post count
-  // If count reaches 5, delete the account
-  async incrementUserRemovedPostCount(tx: any, userId: number): Promise<void> {
-    try {
-      // Get current count
-      const [user] = await tx
-        .select({ removedPostCount: users.removedPostCount })
-        .from(users)
-        .where(eq(users.id, userId));
-      
-      if (!user) return;
-      
-      const newCount = (user.removedPostCount || 0) + 1;
-      
-      // Update the count
-      await tx
-        .update(users)
-        .set({ removedPostCount: newCount })
-        .where(eq(users.id, userId));
-      
-      // If user has had 5 or more posts removed, delete their account
-      // unless they are an admin
-      if (newCount >= 5) {
-        const [userToDelete] = await tx
-          .select({ role: users.role })
-          .from(users)
-          .where(eq(users.id, userId));
-          
-        if (userToDelete && userToDelete.role !== 'admin') {
-          // Mark for deletion after transaction completes
-          setTimeout(() => this.deleteUser(userId), 100);
-        }
-      }
-    } catch (err) {
-      console.error("Error incrementing user removed post count:", err);
-    }
   }
   
   // Check if a user has already reported a post
@@ -1005,6 +986,7 @@ export class DatabaseStorage implements IStorage {
               
             // If user has had 5+ posts removed, schedule account deletion
             if (newCount >= 5 && userInfo.role !== 'admin') {
+              console.log(`User ${post.userId} has ${newCount} removed posts, scheduling account deletion`);
               // Schedule deletion after transaction completes (unless admin)
               setTimeout(() => this.deleteUser(post.userId), 100);
             }
