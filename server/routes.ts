@@ -819,6 +819,92 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).send((error as Error).message);
     }
   });
+  
+  // Post Reporting Endpoints
+  
+  // Report a post
+  app.post("/api/posts/:postId/report", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.postId);
+      const userId = req.user!.id;
+      const { reason } = req.body;
+      
+      // Check if the post ID is valid
+      if (isNaN(postId)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+      
+      // Check if the user has already reported this post
+      const hasReported = await storage.hasUserReportedPost(postId, userId);
+      if (hasReported) {
+        return res.status(400).json({ error: "You have already reported this post" });
+      }
+      
+      // Report the post
+      const postRemoved = await storage.reportPost(postId, userId, reason || "inappropriate");
+      
+      res.status(200).json({ 
+        success: true, 
+        message: "Post reported successfully",
+        postRemoved: postRemoved,
+        autoRemoved: postRemoved ? "Post has been automatically removed due to multiple reports" : null
+      });
+    } catch (error) {
+      console.error("Error reporting post:", error);
+      res.status(400).json({ 
+        success: false,
+        error: (error as Error).message 
+      });
+    }
+  });
+  
+  // For iOS client compatibility
+  app.post("/api/report/post/:postId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.postId);
+      const userId = req.user!.id;
+      const reason = req.body.reason || "inappropriate";
+      
+      // Check if the post ID is valid
+      if (isNaN(postId)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+      
+      // Report the post
+      const postRemoved = await storage.reportPost(postId, userId, reason);
+      
+      res.status(200).json({ 
+        success: true, 
+        message: "Post reported successfully",
+        postRemoved: postRemoved
+      });
+    } catch (error) {
+      console.error("Error reporting post:", error);
+      res.status(400).json({ 
+        success: false,
+        error: (error as Error).message 
+      });
+    }
+  });
+  
+  // Get reported posts for admin
+  app.get("/api/admin/reported-posts", isAdmin, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const adminId = req.user!.id;
+      const reportedPosts = await storage.getReportedPosts(adminId);
+      
+      res.json(reportedPosts);
+    } catch (error) {
+      console.error("Error fetching reported posts:", error);
+      res.status(400).json({ error: (error as Error).message });
+    }
+  });
 
   // Admin user management
   // Special bootstrap endpoint to create the first admin user
