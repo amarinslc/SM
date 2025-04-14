@@ -1,7 +1,7 @@
 import session from "express-session";
-import { users, type User, type InsertUser, Post, Comment, comments, follows, posts, PrivacySettings, privacySettingsSchema } from "@shared/schema";
+import { users, type User, type InsertUser, Post, Comment, comments, follows, posts, postReports, PrivacySettings, privacySettingsSchema, PostReport } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, or, sql } from "drizzle-orm";
+import { eq, and, inArray, or, sql, gt, desc } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { Resend } from 'resend';
@@ -751,9 +751,103 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deletePost(id: number): Promise<void> {
-    await db
-      .delete(posts)
-      .where(eq(posts.id, id));
+    await db.transaction(async (tx) => {
+      // First delete all comments for this post
+      await tx.delete(comments).where(eq(comments.postId, id));
+      
+      // Delete any reports for this post
+      await tx.delete(postReports).where(eq(postReports.postId, id));
+      
+      // Then delete the post itself
+      await tx.delete(posts).where(eq(posts.id, id));
+    });
+  }
+  
+  // Report a post - returns true if post was auto-removed (3+ reports)
+  async reportPost(postId: number, userId: number, reason: string = "inappropriate"): Promise<boolean> {
+    // Check if post exists
+    const [post] = await db.select().from(posts).where(eq(posts.id, postId));
+    if (!post) {
+      throw new Error("Post not found");
+    }
+    
+    // Check if user has already reported this post
+    const hasReported = await this.hasUserReportedPost(postId, userId);
+    if (hasReported) {
+      throw new Error("You have already reported this post");
+    }
+    
+    // Create the report and update report count atomically
+    let postRemoved = false;
+    await db.transaction(async (tx) => {
+      // Create the report
+      await tx.insert(postReports).values({
+        postId,
+        userId,
+        reason
+      });
+      
+      // Increment the report count
+      const [updatedPost] = await tx
+        .update(posts)
+        .set({
+          reportCount: sql`${posts.reportCount} + 1`
+        })
+        .where(eq(posts.id, postId))
+        .returning();
+      
+      // Check if post should be auto-removed (3+ reports)
+      const reportCount = updatedPost.reportCount || 0;
+      if (reportCount >= 3) {
+        await tx
+          .update(posts)
+          .set({ isRemoved: true })
+          .where(eq(posts.id, postId));
+        postRemoved = true;
+      }
+    });
+    
+    return postRemoved;
+  }
+  
+  // Check if a user has already reported a post
+  async hasUserReportedPost(postId: number, userId: number): Promise<boolean> {
+    const [report] = await db
+      .select()
+      .from(postReports)
+      .where(
+        and(
+          eq(postReports.postId, postId),
+          eq(postReports.userId, userId)
+        )
+      );
+    
+    return !!report;
+  }
+  
+  // Get all reported posts for admin review
+  async getReportedPosts(adminId: number): Promise<Post[]> {
+    // Check if user is an admin
+    const [admin] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.id, adminId),
+          eq(users.role, "admin")
+        )
+      );
+    
+    if (!admin) {
+      throw new Error("Unauthorized: Only admins can access reported posts");
+    }
+    
+    // Get posts with at least one report, ordered by report count descending
+    return db
+      .select()
+      .from(posts)
+      .where(gt(posts.reportCount, 0))
+      .orderBy(desc(posts.reportCount));
   }
 
   async verifyEmail(token: string): Promise<boolean> {
