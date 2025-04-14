@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { ShieldAlert, Users } from "lucide-react";
 
 type ReportedPost = {
   id: number;
@@ -116,7 +117,7 @@ function ReportedPostCard({ post, onReview }: { post: ReportedPost; onReview: (p
               <div key={index} className="flex justify-between items-center border-b pb-1">
                 <div>{formatReportReason(report.reason)}</div>
                 <div className="text-muted-foreground">
-                  {format(new Date(report.created_at), 'MMM d, yyyy')}
+                  {report.created_at ? format(new Date(report.created_at), 'MMM d, yyyy') : 'Unknown date'}
                 </div>
               </div>
             ))}
@@ -145,9 +146,75 @@ function ReportedPostCard({ post, onReview }: { post: ReportedPost; onReview: (p
   );
 }
 
+type User = {
+  id: number;
+  username: string;
+  email: string;
+  name: string;
+  role: string;
+  followerCount: number;
+  followingCount: number;
+  removedPostCount: number;
+};
+
+function UserManagementCard({ user, onDeleteUser }: { user: User; onDeleteUser: (userId: number) => void }) {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Avatar className="h-8 w-8">
+              {user.name && <AvatarFallback>{user.name[0].toUpperCase()}</AvatarFallback>}
+            </Avatar>
+            <div>
+              <div className="font-semibold">{user.name}</div>
+              <div className="text-sm text-muted-foreground">@{user.username}</div>
+            </div>
+          </div>
+          <Badge variant={user.role === 'admin' ? "default" : "outline"}>
+            {user.role}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Email:</span>
+            <span>{user.email}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Followers:</span>
+            <span>{user.followerCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Following:</span>
+            <span>{user.followingCount}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Removed Posts:</span>
+            <span>{user.removedPostCount}</span>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter>
+        <Button 
+          variant="destructive" 
+          size="sm" 
+          className="w-full"
+          onClick={() => onDeleteUser(user.id)}
+          disabled={user.role === 'admin'}
+        >
+          Delete User
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
 export default function AdminPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [mainSection, setMainSection] = useState<"moderation" | "users">("moderation");
   const [activeTab, setActiveTab] = useState("all");
 
   // Redirect if not logged in or not an admin
@@ -159,8 +226,26 @@ export default function AdminPage() {
     return <Redirect to="/" />;
   }
 
-  const { data: reportedPosts, isLoading, isError, error } = useQuery<ReportedPost[]>({
+  // Query for reported posts
+  const { 
+    data: reportedPosts, 
+    isLoading: isPostsLoading, 
+    isError: isPostsError, 
+    error: postsError 
+  } = useQuery<ReportedPost[]>({
     queryKey: ['/api/admin/reported-posts'],
+    enabled: mainSection === "moderation",
+  });
+
+  // Query for all users for user management
+  const {
+    data: allUsers,
+    isLoading: isUsersLoading,
+    isError: isUsersError,
+    error: usersError
+  } = useQuery<User[]>({
+    queryKey: ['/api/admin/users'],
+    enabled: mainSection === "users",
   });
 
   const reviewMutation = useMutation({
@@ -187,6 +272,33 @@ export default function AdminPage() {
   const handleReview = (postId: number, action: 'approve' | 'remove') => {
     reviewMutation.mutate({ postId, action });
   };
+  
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: number) => {
+      const res = await apiRequest("DELETE", `/api/admin/users/${userId}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
+      toast({
+        title: "User deleted",
+        description: "The user has been successfully removed from the platform."
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const handleDeleteUser = (userId: number) => {
+    if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
 
   const filteredPosts = (reportedPosts || []).filter(post => {
     if (activeTab === "all") return true;
@@ -198,22 +310,37 @@ export default function AdminPage() {
   const priorityCount = (reportedPosts || []).filter(post => post.is_priority_review).length;
   const removedCount = (reportedPosts || []).filter(post => post.is_removed).length;
 
+  // Loading states
+  const isLoading = (mainSection === "moderation" && isPostsLoading) || 
+                   (mainSection === "users" && isUsersLoading);
+  
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Loading reported posts...</p>
+          <p>Loading data...</p>
         </div>
       </div>
     );
   }
 
-  if (isError) {
+  // Error states
+  if (mainSection === "moderation" && isPostsError) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
-          <p className="text-destructive">Error loading reported posts: {error instanceof Error ? error.message : 'Unknown error'}</p>
+          <p className="text-destructive">Error loading reported posts: {postsError instanceof Error ? postsError.message : 'Unknown error'}</p>
+        </div>
+      </div>
+    );
+  }
+  
+  if (mainSection === "users" && isUsersError) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <div className="text-center">
+          <p className="text-destructive">Error loading users: {usersError instanceof Error ? usersError.message : 'Unknown error'}</p>
         </div>
       </div>
     );
@@ -221,75 +348,130 @@ export default function AdminPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-6">Content Moderation</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <div className="flex space-x-2">
+          <Button
+            variant={mainSection === "moderation" ? "default" : "outline"}
+            onClick={() => setMainSection("moderation")}
+            className="flex items-center gap-1"
+          >
+            <ShieldAlert className="h-4 w-4 mr-1" />
+            <span>Content Moderation</span>
+            {reportedPosts && reportedPosts.length > 0 && (
+              <Badge variant="destructive" className="ml-1">
+                {reportedPosts.filter(post => post.is_priority_review).length > 0
+                  ? reportedPosts.filter(post => post.is_priority_review).length
+                  : reportedPosts.length}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant={mainSection === "users" ? "default" : "outline"}
+            onClick={() => setMainSection("users")}
+            className="flex items-center gap-1"
+          >
+            <Users className="h-4 w-4 mr-1" />
+            User Management
+          </Button>
+        </div>
+      </div>
       
-      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="all">
-            All Reports ({reportedPosts?.length || 0})
-          </TabsTrigger>
-          <TabsTrigger value="priority">
-            Priority ({priorityCount})
-          </TabsTrigger>
-          <TabsTrigger value="removed">
-            Removed ({removedCount})
-          </TabsTrigger>
-        </TabsList>
+      {mainSection === "moderation" && (
+        <>
+          <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="all">
+                All Reports ({reportedPosts?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="priority">
+                Priority ({priorityCount})
+              </TabsTrigger>
+              <TabsTrigger value="removed">
+                Removed ({removedCount})
+              </TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          {filteredPosts.length === 0 ? (
+            <TabsContent value="all" className="space-y-4">
+              {filteredPosts.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">No reported posts to review</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredPosts.map(post => (
+                  <ReportedPostCard 
+                    key={post.id} 
+                    post={post} 
+                    onReview={handleReview} 
+                  />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="priority" className="space-y-4">
+              {filteredPosts.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">No priority reports to review</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredPosts.map(post => (
+                  <ReportedPostCard 
+                    key={post.id} 
+                    post={post} 
+                    onReview={handleReview} 
+                  />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="removed" className="space-y-4">
+              {filteredPosts.length === 0 ? (
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-center text-muted-foreground">No removed posts</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredPosts.map(post => (
+                  <ReportedPostCard 
+                    key={post.id} 
+                    post={post} 
+                    onReview={handleReview} 
+                  />
+                ))
+              )}
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+      
+      {mainSection === "users" && (
+        <>
+          <h2 className="text-2xl font-semibold mb-4">User Management</h2>
+          
+          {allUsers && allUsers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {allUsers.map(userData => (
+                <UserManagementCard 
+                  key={userData.id} 
+                  user={userData} 
+                  onDeleteUser={handleDeleteUser} 
+                />
+              ))}
+            </div>
+          ) : (
             <Card>
               <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">No reported posts to review</p>
+                <p className="text-center text-muted-foreground">No users found</p>
               </CardContent>
             </Card>
-          ) : (
-            filteredPosts.map(post => (
-              <ReportedPostCard 
-                key={post.id} 
-                post={post} 
-                onReview={handleReview} 
-              />
-            ))
           )}
-        </TabsContent>
-
-        <TabsContent value="priority" className="space-y-4">
-          {filteredPosts.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">No priority reports to review</p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredPosts.map(post => (
-              <ReportedPostCard 
-                key={post.id} 
-                post={post} 
-                onReview={handleReview} 
-              />
-            ))
-          )}
-        </TabsContent>
-
-        <TabsContent value="removed" className="space-y-4">
-          {filteredPosts.length === 0 ? (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-center text-muted-foreground">No removed posts</p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredPosts.map(post => (
-              <ReportedPostCard 
-                key={post.id} 
-                post={post} 
-                onReview={handleReview} 
-              />
-            ))
-          )}
-        </TabsContent>
-      </Tabs>
+        </>
+      )}
     </div>
   );
 }
