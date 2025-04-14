@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, primaryKey } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -44,6 +44,8 @@ export const posts = pgTable("posts", {
   content: text("content").notNull(),
   media: jsonb("media").default([]),
   createdAt: timestamp("created_at").defaultNow(),
+  reportCount: integer("report_count").default(0),
+  isRemoved: boolean("is_removed").default(false),
 });
 
 export const comments = pgTable("comments", {
@@ -52,6 +54,18 @@ export const comments = pgTable("comments", {
   userId: integer("user_id").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const postReports = pgTable("post_reports", {
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  reason: text("reason").default("inappropriate"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => {
+  return {
+    // Each user can only report a post once
+    pk: primaryKey({ columns: [table.postId, table.userId] })
+  };
 });
 
 export const insertUserSchema = z.object({
@@ -102,4 +116,5 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
+export type PostReport = typeof postReports.$inferSelect;
 export type PrivacySettings = z.infer<typeof privacySettingsSchema>;

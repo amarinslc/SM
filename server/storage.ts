@@ -87,6 +87,11 @@ export interface IStorage {
   getPost(id: number): Promise<Post | undefined>;
   deletePost(id: number): Promise<void>;
   
+  // Post reporting operations
+  reportPost(postId: number, userId: number, reason?: string): Promise<boolean>;
+  hasUserReportedPost(postId: number, userId: number): Promise<boolean>;
+  getReportedPosts(adminId: number): Promise<Post[]>;
+  
   // Follow request operations
   getPendingFollowRequests(userId: number): Promise<any[]>;
   getOutgoingFollowRequests(userId: number): Promise<any[]>;
