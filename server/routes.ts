@@ -836,6 +836,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid post ID" });
       }
       
+      // Validate report reason
+      const validReasons = ["Hateful", "Harmful_or_Abusive", "Criminal_Activity", "Sexually_Explicit"];
+      if (!reason || !validReasons.includes(reason)) {
+        return res.status(400).json({ 
+          error: "Invalid report reason", 
+          message: "Reason must be one of: Hateful, Harmful_or_Abusive, Criminal_Activity, Sexually_Explicit" 
+        });
+      }
+      
       // Check if the user has already reported this post
       const hasReported = await storage.hasUserReportedPost(postId, userId);
       if (hasReported) {
@@ -843,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Report the post
-      const postRemoved = await storage.reportPost(postId, userId, reason || "inappropriate");
+      const postRemoved = await storage.reportPost(postId, userId, reason);
       
       res.status(200).json({ 
         success: true, 
@@ -860,18 +869,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // For iOS client compatibility
+  // iOS compatible post reporting endpoint
   app.post("/api/report/post/:postId", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const postId = parseInt(req.params.postId);
       const userId = req.user!.id;
-      const reason = req.body.reason || "inappropriate";
+      const { reason } = req.body;
       
       // Check if the post ID is valid
       if (isNaN(postId)) {
         return res.status(400).json({ error: "Invalid post ID" });
+      }
+      
+      // Validate report reason
+      const validReasons = ["Hateful", "Harmful_or_Abusive", "Criminal_Activity", "Sexually_Explicit"];
+      if (!reason || !validReasons.includes(reason)) {
+        return res.status(400).json({ 
+          error: "Invalid report reason", 
+          message: "Reason must be one of: Hateful, Harmful_or_Abusive, Criminal_Activity, Sexually_Explicit" 
+        });
+      }
+      
+      // Check if the user has already reported this post
+      const hasReported = await storage.hasUserReportedPost(postId, userId);
+      if (hasReported) {
+        return res.status(400).json({ error: "You have already reported this post" });
       }
       
       // Report the post
@@ -891,6 +915,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin review endpoints for content moderation
+  app.post("/api/admin/review-post/:postId", isAdmin, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.postId);
+      const adminId = req.user!.id;
+      const { action } = req.body;
+      
+      // Check if the post ID is valid
+      if (isNaN(postId)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+      
+      // Validate action
+      if (!action || !['approve', 'remove'].includes(action)) {
+        return res.status(400).json({ 
+          error: "Invalid action", 
+          message: "Action must be either 'approve' or 'remove'" 
+        });
+      }
+      
+      // Process the review
+      const success = await storage.reviewPost(postId, adminId, action as 'approve' | 'remove');
+      
+      if (success) {
+        res.status(200).json({ 
+          success: true, 
+          message: action === 'approve' 
+            ? "Post has been approved and report cleared" 
+            : "Post has been removed and user violation recorded",
+          action
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: "Failed to process review" 
+        });
+      }
+    } catch (error) {
+      console.error("Error reviewing post:", error);
+      res.status(400).json({ 
+        success: false,
+        error: (error as Error).message 
+      });
+    }
+  });
+  
   // Get reported posts for admin
   app.get("/api/admin/reported-posts", isAdmin, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -903,6 +975,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching reported posts:", error);
       res.status(400).json({ error: (error as Error).message });
+    }
+  });
+  
+  // iOS compatible reported posts endpoint
+  app.get("/api/moderation/posts", isAdmin, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const adminId = req.user!.id;
+      const reportedPosts = await storage.getReportedPosts(adminId);
+      
+      res.json({
+        posts: reportedPosts,
+        count: reportedPosts.length,
+        priorityCount: reportedPosts.filter((post: any) => post.is_priority_review).length
+      });
+    } catch (error) {
+      console.error("Error fetching reported posts:", error);
+      res.status(400).json({ 
+        success: false,
+        error: (error as Error).message 
+      });
+    }
+  });
+  
+  // iOS compatible post review endpoint
+  app.post("/api/moderation/review/:postId", isAdmin, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+
+    try {
+      const postId = parseInt(req.params.postId);
+      const adminId = req.user!.id;
+      const { action } = req.body;
+      
+      // Check if the post ID is valid
+      if (isNaN(postId)) {
+        return res.status(400).json({ error: "Invalid post ID" });
+      }
+      
+      // Validate action
+      if (!action || !['approve', 'remove'].includes(action)) {
+        return res.status(400).json({ 
+          error: "Invalid action", 
+          message: "Action must be either 'approve' or 'remove'" 
+        });
+      }
+      
+      // Process the review
+      const success = await storage.reviewPost(postId, adminId, action as 'approve' | 'remove');
+      
+      if (success) {
+        res.status(200).json({ 
+          success: true, 
+          message: action === 'approve' 
+            ? "Post has been approved and reports cleared" 
+            : "Post has been removed and user violation recorded",
+          action
+        });
+      } else {
+        res.status(400).json({ 
+          success: false, 
+          message: "Failed to process review" 
+        });
+      }
+    } catch (error) {
+      console.error("Error reviewing post:", error);
+      res.status(400).json({ 
+        success: false,
+        error: (error as Error).message 
+      });
     }
   });
 
