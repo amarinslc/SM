@@ -4,11 +4,12 @@ import { PostForm } from "@/components/post-form";
 import { UserCard } from "@/components/user-card";
 import { PendingRequests } from "@/components/pending-requests";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { Post, User } from "@shared/schema";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, LogOut, Search, User as UserIcon } from "lucide-react";
+import { Loader2, LogOut, Search, User as UserIcon, ShieldAlert } from "lucide-react";
 import { Link } from "wouter";
 import { useDebounce } from "@/hooks/use-debounce";
 
@@ -28,6 +29,12 @@ export default function HomePage() {
   const { data: requests, isLoading: isRequestsLoading } = useQuery<any[]>({
     queryKey: [`/api/users/${user?.id}/requests`],
     enabled: !!user?.id,
+  });
+  
+  // Get reported posts count for admin badge
+  const { data: reportedPosts } = useQuery<any[]>({
+    queryKey: ['/api/admin/reported-posts'],
+    enabled: !!user?.id && user.role === 'admin',
   });
 
   const { data: searchResults, isLoading: isSearching, error: searchError } = useQuery<User[]>({
@@ -77,8 +84,18 @@ export default function HomePage() {
             </Link>
             {user.role === 'admin' && (
               <Link href="/admin">
-                <Button variant="ghost" className="text-sm">
-                  Admin
+                <Button variant="ghost" className="text-sm relative">
+                  <div className="flex items-center gap-1">
+                    <ShieldAlert className="h-4 w-4 mr-1" />
+                    Admin
+                    {reportedPosts && reportedPosts.length > 0 && (
+                      <Badge variant="destructive" className="text-[10px] px-1 h-5 min-w-5 flex items-center justify-center">
+                        {reportedPosts.filter((post: any) => post.is_priority_review).length > 0 
+                          ? reportedPosts.filter((post: any) => post.is_priority_review).length
+                          : reportedPosts.length}
+                      </Badge>
+                    )}
+                  </div>
                 </Button>
               </Link>
             )}
