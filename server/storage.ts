@@ -985,8 +985,8 @@ export class DatabaseStorage implements IStorage {
               .set({ removedPostCount: newCount })
               .where(eq(users.id, post.userId));
               
-            // If user has had 5+ posts removed, schedule account deletion
-            if (newCount >= 5 && userInfo.role !== 'admin') {
+            // If user has had 10+ posts removed, schedule account deletion
+            if (newCount >= 10 && userInfo.role !== 'admin') {
               console.log(`User ${post.userId} has ${newCount} removed posts, scheduling account deletion`);
               // Schedule deletion after transaction completes (unless admin)
               setTimeout(() => this.deleteUser(post.userId), 100);
