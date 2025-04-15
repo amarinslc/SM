@@ -651,13 +651,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update post creation to handle video files and use Cloudinary
+  // Update post creation to handle video files and use Cloudinary - Improved for iOS compatibility
   app.post("/api/posts", upload.array('media'), async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       console.log('Received post creation request:', {
         body: req.body,
+        contentType: req.headers['content-type'] || 'not-set',
         files: req.files ? (req.files as Express.Multer.File[]).length : 0
       });
 
@@ -665,13 +666,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const media = [];
 
       if (files && files.length > 0) {
+        console.log(`Processing ${files.length} media files`);
         for (const file of files) {
-          console.log('Processing file:', file.originalname, 'mimetype:', file.mimetype);
+          console.log('Processing file:', file.originalname, 'mimetype:', file.mimetype, 'size:', file.size);
           
-          const fileType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+          // Determine file type based on mimetype or filename if available
+          let fileType = 'image'; // Default to image
+          if (file.mimetype) {
+            fileType = file.mimetype.startsWith('video/') ? 'video' : 'image';
+          } else if (file.originalname && 
+                    (file.originalname.endsWith('.mp4') || 
+                     file.originalname.endsWith('.mov') || 
+                     file.originalname.endsWith('.avi'))) {
+            fileType = 'video';
+          }
           
           try {
-            // Upload to Cloudinary
+            // Upload to Cloudinary with proper resource type
             const result = await uploadToCloudinary(file.path, {
               folder: 'dgrs48tas/posts',
               resource_type: fileType === 'video' ? 'video' : 'image'
@@ -687,9 +698,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`Uploaded media to Cloudinary: ${result.secure_url}`);
           } catch (err) {
             console.error('Cloudinary upload failed:', err);
-            // No fallback - return error to client for the entire upload
+            // Add more detailed error information
             return res.status(500).json({ 
-              error: "Failed to upload media. Please try creating your post again later." 
+              error: "Failed to upload media. Please try creating your post again later.",
+              details: (err as Error).message 
             });
           }
         }
