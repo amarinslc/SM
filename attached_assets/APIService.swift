@@ -558,12 +558,14 @@ class APIService {
         if let imageData = imageData {
             for (index, data) in imageData.enumerated() {
                 // Key fix: Use the same field name for all images (without array notation in name)
-                // This matches how FormData works in JavaScript
+                // This matches how FormData works in JavaScript and what multer expects
                 let filename = "image\(index).jpg"
                 body.append("--\(boundary)\r\n".data(using: .utf8)!)
                 // Just use the fieldName without any brackets - this is crucial
                 body.append("Content-Disposition: form-data; name=\"\(imageFieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-                body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+                // Detect MIME type from the data if possible
+                let mimeType = detectMimeType(from: data) ?? "image/jpeg"
+                body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
                 body.append(data)
                 body.append("\r\n".data(using: .utf8)!)
             }
@@ -692,6 +694,40 @@ class APIService {
 }
 
 
+
+// MIME type detection helper
+private func detectMimeType(from data: Data) -> String? {
+    // Simple magic number detection for common image formats
+    if data.count >= 2 {
+        let bytes = [UInt8](data.prefix(4))
+        
+        // JPEG signature: FF D8 FF
+        if bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
+            return "image/jpeg"
+        }
+        
+        // PNG signature: 89 50 4E 47
+        if bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 {
+            return "image/png"
+        }
+        
+        // GIF signature: 47 49 46 38
+        if bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38 {
+            return "image/gif"
+        }
+        
+        // WebP signature: 52 49 46 46 and WEBP at offset 8
+        if data.count >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 {
+            let webpBytes = [UInt8](data[8..<12])
+            if webpBytes[0] == 0x57 && webpBytes[1] == 0x45 && webpBytes[2] == 0x42 && webpBytes[3] == 0x50 {
+                return "image/webp"
+            }
+        }
+    }
+    
+    // Default to JPEG if unknown
+    return "image/jpeg"
+}
 
 // Protocol for types that can be created with an empty initializer
 protocol EmptyInitializable {
