@@ -25,7 +25,7 @@ class AuthAPI {
             "email": email,
             "password": password,
             "confirmPassword": confirmPassword,
-            "displayName": name  // Changed from name to displayName per API
+            "name": name  
         ]
         
         if let bio = bio {
@@ -76,3 +76,4 @@ class AuthAPI {
 struct ServerInfo: Decodable {
     let status: String
 }
+

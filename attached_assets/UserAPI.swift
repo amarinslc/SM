@@ -9,7 +9,7 @@ class UserAPI {
     
     // Get user profile (using correct endpoint path from API docs)
     func getUserProfile(userId: Int) -> AnyPublisher<ProfileResponse, NetworkError> {
-        print("🔍 Fetching user profile for ID: \(userId) using new API format")
+        //print("🔍 Fetching user profile for ID: \(userId) using new API format")
         return apiService.request(endpoint: "/users/\(userId)", method: .get)
     }
     
@@ -31,13 +31,13 @@ class UserAPI {
     
     // Get pending follow requests (incoming)
     func getPendingFollowRequests() -> AnyPublisher<[FollowRequest], NetworkError> {
-        print("🔍 Fetching pending follow requests using new API path")
+        //print("🔍 Fetching pending follow requests using new API path")
         return apiService.request(endpoint: "/follow-requests/pending", method: .get)
     }
     
     // Get outgoing follow requests (sent by current user)
     func getOutgoingFollowRequests() -> AnyPublisher<[FollowRequest], NetworkError> {
-        print("🔍 Fetching outgoing follow requests using new API path")
+        //print("🔍 Fetching outgoing follow requests using new API path")
         return apiService.request(endpoint: "/follow-requests/outgoing", method: .get)
     }
     
@@ -68,122 +68,40 @@ class UserAPI {
     
     // Accept follow request
     func acceptFollowRequest(requestId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        print("✅ Accepting follow request ID \(requestId)")
+        //print("✅ Accepting follow request ID \(requestId)")
         return apiService.request(endpoint: "/follow-requests/\(requestId)/accept", method: .post)
-            .handleEvents(
-                receiveSubscription: { _ in
-                    print("🔶 Accept request subscribed for ID \(requestId)")
-                },
-                receiveOutput: { response in
-                    print("✅ Accept request succeeded for ID \(requestId): \(response)")
-                },
-                receiveCompletion: { completion in
-                    if case let .failure(error) = completion {
-                        print("❌ Accept request failed for ID \(requestId): \(error)")
-                    } else {
-                        print("✅ Accept request completed successfully for ID \(requestId)")
-                    }
-                },
-                receiveCancel: {
-                    print("🚫 Accept request was cancelled for ID \(requestId)")
-                }
-            )
-            .eraseToAnyPublisher()
     }
     
-    // Reject follow request - using the new endpoint format with explicit debug logging
+    // Reject follow request - using the new endpoint format
     func rejectFollowRequest(requestId: Int) -> AnyPublisher<FollowResponse, NetworkError> {
-        print("❌ REJECT: Starting reject follow request ID \(requestId)")
-        
-        // Log the full API endpoint URL for debugging
-        let endpoint = "/follow-requests/\(requestId)/reject"
-        print("❌ REJECT: Using endpoint \(endpoint)")
+        //print("❌ STARTING Reject follow request ID \(requestId)")
         
         // Using explicit typing for the publisher
         let publisher: AnyPublisher<FollowResponse, NetworkError> = apiService.request(
-            endpoint: endpoint,
+            endpoint: "/follow-requests/\(requestId)/reject",
             method: .post
         )
         
         return publisher
             .handleEvents(
                 receiveSubscription: { _ in
-                    print("❌ REJECT: Request subscribed for ID \(requestId)")
+                    //print("🔶 Reject request subscribed for ID \(requestId)")
                 },
                 receiveOutput: { response in
-                    print("❌ REJECT: Request succeeded for ID \(requestId): \(response)")
+                    //print("✅ Reject request succeeded for ID \(requestId): \(response)")
                 },
                 receiveCompletion: { completion in
                     if case let .failure(error) = completion {
-                        print("❌ REJECT: Request failed for ID \(requestId): \(error)")
+                        //print("❌ Reject request failed for ID \(requestId): \(error)")
                     } else {
-                        print("❌ REJECT: Request completed successfully for ID \(requestId)")
+                        //print("✅ Reject request completed successfully for ID \(requestId)")
                     }
                 },
                 receiveCancel: {
-                    print("❌ REJECT: Request was cancelled for ID \(requestId)")
+                    //print("🚫 Reject request was cancelled for ID \(requestId)")
                 }
             )
             .eraseToAnyPublisher()
-    }
-    
-    // MARK: - Privacy Settings
-    
-    // Get user's privacy settings
-    func getPrivacySettings() -> AnyPublisher<PrivacySettings, NetworkError> {
-        print("🔒 Fetching privacy settings")
-        return apiService.request(endpoint: "/privacy", method: .get)
-            .handleEvents(
-                receiveCompletion: { completion in
-                    if case let .failure(error) = completion {
-                        print("❌ Failed to fetch privacy settings: \(error)")
-                    }
-                }
-            )
-            .eraseToAnyPublisher()
-    }
-    
-    // Update user's privacy settings
-    func updatePrivacySettings(settings: PrivacySettings) -> AnyPublisher<PrivacySettings, NetworkError> {
-        print("🔒 Updating privacy settings")
-        return apiService.request(
-            endpoint: "/privacy",
-            method: .patch,
-            parameters: settings.asDictionary()
-        )
-        .handleEvents(
-            receiveCompletion: { completion in
-                if case let .failure(error) = completion {
-                    print("❌ Failed to update privacy settings: \(error)")
-                }
-            }
-        )
-        .eraseToAnyPublisher()
-    }
-    
-    // MARK: - Account Management
-    
-    // Delete user account
-    func deleteAccount(password: String) -> AnyPublisher<FollowResponse, NetworkError> {
-        print("⚠️ Deleting user account")
-        return apiService.request(
-            endpoint: "/account/delete",
-            method: .post,
-            parameters: ["password": password]
-        )
-        .handleEvents(
-            receiveOutput: { response in
-                print("✅ Account deletion request succeeded: \(response)")
-                // Clear auth credentials on successful deletion
-                AuthManager.shared.logout()
-            },
-            receiveCompletion: { completion in
-                if case let .failure(error) = completion {
-                    print("❌ Account deletion failed: \(error)")
-                }
-            }
-        )
-        .eraseToAnyPublisher()
     }
 
     
@@ -292,63 +210,55 @@ struct FollowResponse: Codable {
     }
 }
 
-// MARK: - Privacy Settings Models
+extension UserAPI {
+    // Account Deletion API call.
+    // iOS-compatible: POST /api/account/delete with password in request body.
+    func deleteAccount(password: String) -> AnyPublisher<DeleteAccountResponse, NetworkError> {
+        let params = ["password": password]
+        return apiService.request(endpoint: "/account/delete", method: .post, parameters: params)
+    }
+    
+    // Update Privacy Settings API call.
+    // PATCH /api/user/privacy-settings accepts any changes in the privacy settings fields.
+    func updatePrivacySettings(settings: [String: Any]) -> AnyPublisher<PrivacySettings, NetworkError> {
+        return apiService.request(endpoint: "/user/privacy-settings", method: .patch, parameters: settings)
+    }
+}
 
-// Definition of NotificationPreferences
+// Response models
+
+struct DeleteAccountResponse: Codable {
+    let message: String
+    // Make success optional and default to true if absent.
+    let success: Bool?
+
+    private enum CodingKeys: String, CodingKey {
+        case message
+        case success
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.message = try container.decode(String.self, forKey: .message)
+        // If the key "success" is missing, assume a default of true.
+        self.success = try container.decodeIfPresent(Bool.self, forKey: .success) ?? true
+    }
+}
+
+// PrivacySettings model – extended to include new settings.
+struct PrivacySettings: Codable {
+    var showEmail: Bool
+    var allowTagging: Bool
+    var activityVisibility: String
+    var notificationPreferences: NotificationPreferences
+    // New keys added for user consent settings
+    var privacyAgreement: Bool?
+    var dataConsent: Bool?
+}
+
 struct NotificationPreferences: Codable {
     var likes: Bool
     var comments: Bool
     var follows: Bool
     var messages: Bool
-    
-    func asDictionary() -> [String: Any] {
-        return [
-            "likes": likes,
-            "comments": comments,
-            "follows": follows,
-            "messages": messages
-        ]
-    }
-    
-    init(likes: Bool = true, comments: Bool = true, follows: Bool = true, messages: Bool = true) {
-        self.likes = likes
-        self.comments = comments
-        self.follows = follows
-        self.messages = messages
-    }
-}
-
-// Definition of PrivacySettings
-struct PrivacySettings: Codable {
-    var showEmail: Bool
-    var allowTagging: Bool
-    var allowDirectMessages: Bool
-    var activityVisibility: String
-    var notificationPreferences: NotificationPreferences
-    
-    enum CodingKeys: String, CodingKey {
-        case showEmail, allowTagging, allowDirectMessages, activityVisibility, notificationPreferences
-    }
-    
-    func asDictionary() -> [String: Any] {
-        return [
-            "showEmail": showEmail,
-            "allowTagging": allowTagging,
-            "allowDirectMessages": allowDirectMessages,
-            "activityVisibility": activityVisibility,
-            "notificationPreferences": notificationPreferences.asDictionary()
-        ]
-    }
-    
-    init(showEmail: Bool = false, 
-         allowTagging: Bool = true, 
-         allowDirectMessages: Bool = true, 
-         activityVisibility: String = "followers",
-         notificationPreferences: NotificationPreferences = NotificationPreferences()) {
-        self.showEmail = showEmail
-        self.allowTagging = allowTagging
-        self.allowDirectMessages = allowDirectMessages
-        self.activityVisibility = activityVisibility
-        self.notificationPreferences = notificationPreferences
-    }
 }

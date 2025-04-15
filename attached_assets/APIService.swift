@@ -36,6 +36,19 @@ enum NetworkError: Error {
         }
     }
 }
+struct MultipartDebugResponse: Codable {
+    let id: Int?
+    let userId: Int?
+    let content: String?
+    let media: [String]?
+    let createdAt: String?
+    let error: String?
+    let message: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, userId, content, media, createdAt, error, message
+    }
+}
 
 // Extension to make NetworkError conform to Equatable
 extension NetworkError: Equatable {
@@ -114,7 +127,7 @@ class NetworkManager: NSObject, URLSessionDelegate {
             let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
             if !cookies.isEmpty {
                 HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
-                print("🍪 Received cookies from redirect: \(cookies)")
+                //print("🍪 Received cookies from redirect: \(cookies)")
             }
         }
         
@@ -140,7 +153,7 @@ class NetworkManager: NSObject, URLSessionDelegate {
 class APIService {
     static let shared = APIService()
     
-    private let baseURL = "https://dbsocial.replit.app/api"
+    private let baseURL = "https://dunbarsocial.app/api"
     private var authRetryInProgress = false
     private var pendingRequests: [(URLRequest, (Data?, URLResponse?, Error?) -> Void)] = []
     
@@ -168,7 +181,7 @@ class APIService {
         // Add cookie explicitly from cookie storage
         let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
         if !cookies.isEmpty {
-            print("🍪 Adding cookies to request: \(cookies)")
+            //print("🍪 Adding cookies to request: \(cookies)")
             let cookieHeaders = HTTPCookie.requestHeaderFields(with: cookies)
             for (field, value) in cookieHeaders {
                 request.addValue(value, forHTTPHeaderField: field)
@@ -185,12 +198,12 @@ class APIService {
                     URLQueryItem(name: key, value: "\(value)")
                 }
                 request.url = components.url
-                print("🔍 URL with query parameters: \(components.url?.absoluteString ?? "invalid url")")
+                //print("🔍 URL with query parameters: \(components.url?.absoluteString ?? "invalid url")")
             } else {
                 do {
                     request.httpBody = try JSONSerialization.data(withJSONObject: parameters, options: [])
                 } catch {
-                    print("❌ JSONSerialization error: \(error)")
+                    //("❌ JSONSerialization error: \(error)")
                     return Fail(error: NetworkError.requestFailed(error)).eraseToAnyPublisher()
                 }
             }
@@ -199,34 +212,34 @@ class APIService {
         return NetworkManager.shared.session.dataTaskPublisher(for: request)
             .tryMap { data, response in
                 // Debug logging
-                print("📲 Response received:")
+                // print("📲 Response received:")
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("🔢 Status code: \(httpResponse.statusCode)")
+                    //print("🔢 Status code: \(httpResponse.statusCode)")
                     
                     // Save any cookies from the response
                     if let headerFields = httpResponse.allHeaderFields as? [String: String] {
                         let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
                         if !cookies.isEmpty {
                             HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
-                            print("🍪 Saved cookies from response: \(cookies)")
+                            //print("🍪 Saved cookies from response: \(cookies)")
                         }
                     }
                     
                     // Print cookies for debugging
                     let cookiesAfter = HTTPCookieStorage.shared.cookies(for: url) ?? []
                     if !cookiesAfter.isEmpty {
-                        print("🍪 Cookies after response: \(cookiesAfter)")
+                        //print("🍪 Cookies after response: \(cookiesAfter)")
                     } else {
-                        print("🍪 No cookies found after response")
+                        //print("🍪 No cookies found after response")
                     }
                 }
                 
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("📄 Response data: \(responseString)")
+                    // print("📄 Response data: \(responseString)")
                     
                     // Check if response is HTML (indicates auth issue or error)
                     if responseString.trimmingCharacters(in: .whitespacesAndNewlines).starts(with: "<") {
-                        print("⚠️ Received HTML response instead of JSON")
+                        //print("⚠️ Received HTML response instead of JSON")
                         throw NetworkError.htmlResponse
                     }
                 }
@@ -255,11 +268,11 @@ class APIService {
                 }
             }
             .mapError { error in
-                print("❌ Network error: \(error.localizedDescription)")
+                //print("❌ Network error: \(error.localizedDescription)")
                 if let networkError = error as? NetworkError {
                     // Handle authentication issues by attempting to refresh
                     if retryForAuth && (networkError == NetworkError.unauthorized || networkError == NetworkError.htmlResponse) {
-                        print("🔄 Authentication issue detected - requesting refresh")
+                        // print("🔄 Authentication issue detected - requesting refresh")
                         return NetworkError.unauthorized
                     }
                     return networkError
@@ -273,19 +286,19 @@ class APIService {
                     if data.count == 0 {
                         if Bool.self == T.self || Optional<Bool>.self == T.self {
                             // For endpoints that return nothing but success/failure
-                            print("✅ Empty response handled as success (Bool)")
+                            //print("✅ Empty response handled as success (Bool)")
                             return Just(true as! T)
                                 .setFailureType(to: NetworkError.self)
                                 .eraseToAnyPublisher()
                         } else if T.self == FollowResponse.self {
                             // For follow endpoints that might return empty responses
-                            print("✅ Empty response handled as success (FollowResponse)")
+                            //print("✅ Empty response handled as success (FollowResponse)")
                             return Just(FollowResponse(success: true) as! T)
                                 .setFailureType(to: NetworkError.self)
                                 .eraseToAnyPublisher()
                         } else {
                             // Handle any other type that might receive empty response
-                            print("⚠️ Received empty response for type \(T.self) - attempting best effort handling")
+                            // print("⚠️ Received empty response for type \(T.self) - attempting best effort handling")
                             // Try to create a default instance if it's a decodable type with empty initializer
                             if let decodableType = T.self as? Decodable.Type,
                                let emptyInit = decodableType as? EmptyInitializable.Type,
@@ -334,11 +347,11 @@ class APIService {
                     return self.refreshAuth()
                         .flatMap { success -> AnyPublisher<T, NetworkError> in
                             if success {
-                                print("✅ Auth refreshed, retrying request")
+                                //print("✅ Auth refreshed, retrying request")
                                 return self.request(endpoint: endpoint, method: method,
                                                     parameters: parameters, retryForAuth: false)
                             } else {
-                                print("❌ Auth refresh failed")
+                                //print("❌ Auth refresh failed")
                                 return Fail(error: NetworkError.unauthorized).eraseToAnyPublisher()
                             }
                         }
@@ -348,90 +361,111 @@ class APIService {
             }
             .eraseToAnyPublisher()
     }
-    
+    // Raw request method that returns Data and URLResponse directly
+    // Removed generic parameter T since it's not used
+    func requestRaw(
+        endpoint: String,
+        method: HTTPMethod = .get,
+        parameters: [String: Any]? = nil
+    ) -> AnyPublisher<(Data, URLResponse), NetworkError> {
+        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+            print("❌ Invalid URL: \(baseURL)\(endpoint)")
+            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+        }
+        
+        print("📡 Making raw request to: \(url.absoluteString)")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = method.rawValue
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.addValue("application/json", forHTTPHeaderField: "Accept")
+        
+        // Add cookie explicitly from cookie storage
+        let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+        if !cookies.isEmpty {
+            print("🍪 Adding cookies to request: \(cookies)")
+            let cookieHeaders = HTTPCookie.requestHeaderFields(with: cookies)
+            for (field, value) in cookieHeaders {
+                request.addValue(value, forHTTPHeaderField: field)
+            }
+        } else {
+            print("⚠️ No cookies available for \(url)")
+        }
+        
+        // Add parameters to the request
+        if let parameters = parameters {
+            if method == .get {
+                var components = URLComponents(url: url, resolvingAgainstBaseURL: true)!
+                components.queryItems = parameters.map { key, value in
+                    URLQueryItem(name: key, value: "\(value)")
+                }
+                request.url = components.url
+                print("🔍 URL with query parameters: \(components.url?.absoluteString ?? "invalid url")")
+            } else {
+                do {
+                    request.httpBody = try JSONSerialization.data(withJSONObject: parameters, options: [])
+                } catch {
+                    print("❌ JSONSerialization error: \(error)")
+                    return Fail(error: NetworkError.requestFailed(error)).eraseToAnyPublisher()
+                }
+            }
+        }
+        
+        return NetworkManager.shared.session.dataTaskPublisher(for: request)
+            .mapError { error in
+                return NetworkError.requestFailed(error)
+            }
+            .handleEvents(receiveOutput: { data, response in
+                // Debug logging
+                print("📲 Response received:")
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("🔢 Status code: \(httpResponse.statusCode)")
+                    
+                    // Save any cookies from the response
+                    if let headerFields = httpResponse.allHeaderFields as? [String: String] {
+                        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
+                        if !cookies.isEmpty {
+                            HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
+                            print("🍪 Saved cookies from response: \(cookies)")
+                        }
+                    }
+                    
+                    // Print cookies for debugging
+                    let cookiesAfter = HTTPCookieStorage.shared.cookies(for: url) ?? []
+                    if !cookiesAfter.isEmpty {
+                        print("🍪 Cookies after response: \(cookiesAfter)")
+                    } else {
+                        print("🍪 No cookies found after response")
+                    }
+                }
+                
+                // Try to print response as text if possible
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("📄 Response data: \(responseString)")
+                } else {
+                    print("📄 Response data: (binary data)")
+                }
+            })
+            .map { data, response -> (Data, URLResponse) in
+                // This explicit mapping fixes the type inference issue
+                return (data, response)
+            }
+            .eraseToAnyPublisher()
+    }
     // Private method to refresh authentication
     private func refreshAuth() -> AnyPublisher<Bool, NetworkError> {
         print("🔐 Refreshing authentication...")
         
-        // First make sure server is awake
-        return wakeUpServer()
-            .flatMap { success -> AnyPublisher<Bool, NetworkError> in
-                if !success {
-                    return Just(false)
-                        .setFailureType(to: NetworkError.self)
-                        .eraseToAnyPublisher()
-                }
-                
-                // Then try to reach the /user endpoint to refresh the session
-                return self.refreshAuthIfNeeded()
-                    .map { success -> Bool in
-                        print(success ? "✅ Authentication refreshed successfully" : "❌ Authentication refresh failed")
-                        return success
-                    }
-                    .setFailureType(to: NetworkError.self)
-                    .eraseToAnyPublisher()
+        // Simply try to reach the /user endpoint to refresh the session
+        return self.refreshAuthIfNeeded()
+            .map { success -> Bool in
+                //print(success ? "✅ Authentication refreshed successfully" : "❌ Authentication refresh failed")
+                return success
             }
+            .setFailureType(to: NetworkError.self)
             .eraseToAnyPublisher()
     }
     
-    // Wake up the Replit server
-    func wakeUpServer() -> AnyPublisher<Bool, Never> {
-        guard let url = URL(string: "\(baseURL)/storage/health") else {
-            return Just(false).eraseToAnyPublisher()
-        }
-        
-        print("🚀 Waking up server...")
-        
-        let request = URLRequest(url: url)
-        
-        return NetworkManager.shared.session.dataTaskPublisher(for: request)
-            .tryMap { data, response -> Bool in
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    return false
-                }
-                
-                if httpResponse.statusCode == 200 {
-                    print("✅ Server is awake")
-                    return true
-                } else {
-                    print("❌ Server returned status: \(httpResponse.statusCode)")
-                    return false
-                }
-            }
-            .replaceError(with: false)
-            .eraseToAnyPublisher()
-    }
-    
-    // Enhanced wake up server function with multiple retries
-    func wakeUpServerEnhanced(maxRetries: Int = 3) -> AnyPublisher<Bool, Never> {
-        return wakeUpServerWithRetry(currentRetry: 0, maxRetries: maxRetries)
-    }
-    
-    private func wakeUpServerWithRetry(currentRetry: Int, maxRetries: Int) -> AnyPublisher<Bool, Never> {
-        print("🚀 Waking up server (attempt \(currentRetry + 1) of \(maxRetries))...")
-        
-        return wakeUpServer()
-            .flatMap { success -> AnyPublisher<Bool, Never> in
-                if success {
-                    print("✅ Server is now awake")
-                    return Just(true).eraseToAnyPublisher()
-                } else if currentRetry < maxRetries - 1 {
-                    print("⚠️ Server wake-up attempt \(currentRetry + 1) failed, retrying...")
-                    // Exponential backoff: wait longer for each retry
-                    let delay = TimeInterval(pow(2.0, Double(currentRetry)))
-                    return Just(false)
-                        .delay(for: .seconds(delay), scheduler: DispatchQueue.main)
-                        .flatMap { _ in
-                            self.wakeUpServerWithRetry(currentRetry: currentRetry + 1, maxRetries: maxRetries)
-                        }
-                        .eraseToAnyPublisher()
-                } else {
-                    print("❌ Server wake-up failed after \(maxRetries) attempts")
-                    return Just(false).eraseToAnyPublisher()
-                }
-            }
-            .eraseToAnyPublisher()
-    }
     
     // Function to check authentication status and refresh if needed
     func refreshAuthIfNeeded() -> AnyPublisher<Bool, Never> {
@@ -483,7 +517,7 @@ class APIService {
     // Function for multipart/form-data requests (for file uploads)
     func uploadMultipart<T: Decodable>(
         endpoint: String,
-        method: HTTPMethod = .post,  // Add this parameter
+        method: HTTPMethod = .post,
         parameters: [String: Any],
         imageData: [Data]? = nil,
         imageFieldName: String = "media"
@@ -498,7 +532,7 @@ class APIService {
         let boundary = "Boundary-\(UUID().uuidString)"
         
         var request = URLRequest(url: url)
-        request.httpMethod = method.rawValue     // Use the provided method (can be PATCH)
+        request.httpMethod = method.rawValue
         request.setValue("multipart/form-data; boundary=\(boundary)",
                          forHTTPHeaderField: "Content-Type")
         
@@ -523,8 +557,11 @@ class APIService {
         // Append image data if provided
         if let imageData = imageData {
             for (index, data) in imageData.enumerated() {
+                // Key fix: Use the same field name for all images (without array notation in name)
+                // This matches how FormData works in JavaScript
                 let filename = "image\(index).jpg"
                 body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                // Just use the fieldName without any brackets - this is crucial
                 body.append("Content-Disposition: form-data; name=\"\(imageFieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
                 body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
                 body.append(data)
@@ -536,33 +573,54 @@ class APIService {
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
         
-        // Continue with the existing upload logic...
+        print("📦 Total request body size: \(body.count) bytes")
+        
+        
         return NetworkManager.shared.session.dataTaskPublisher(for: request)
-            .tryMap { data, response in
+            .mapError { error -> NetworkError in
+                print("❌ Network error: \(error.localizedDescription)")
+                return NetworkError.requestFailed(error)
+            }
+            .tryMap { data, response -> Data in
+                // Enhanced response logging
                 print("📲 Multipart response received:")
-                if let httpResponse = response as? HTTPURLResponse {
-                    print("🔢 Status code: \(httpResponse.statusCode)")
-                    if let headerFields = httpResponse.allHeaderFields as? [String: String] {
-                        let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
-                        if !cookies.isEmpty {
-                            HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
-                            print("🍪 Saved cookies from multipart response: \(cookies)")
-                        }
-                    }
-                }
-                
-                if let responseString = String(data: data, encoding: .utf8) {
-                    let trimmedResponse = responseString.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if trimmedResponse.starts(with: "<") {
-                        print("⚠️ Received HTML response instead of JSON")
-                        throw NetworkError.htmlResponse
-                    }
-                }
-                
                 guard let httpResponse = response as? HTTPURLResponse else {
                     throw NetworkError.invalidResponse
                 }
                 
+                print("🔢 Status code: \(httpResponse.statusCode)")
+                
+                // Save cookies
+                if let headerFields = httpResponse.allHeaderFields as? [String: String] {
+                    let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
+                    if !cookies.isEmpty {
+                        HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
+                    }
+                }
+                
+                // Log response body
+                if let responseString = String(data: data, encoding: .utf8) {
+                    print("📄 Response data: \(responseString)")
+                    
+                    // Try to decode as debug response for better error details
+                    if httpResponse.statusCode >= 400 {
+                        do {
+                            let debugResponse = try JSONDecoder().decode(MultipartDebugResponse.self, from: data)
+                            print("🐞 Debug decoded response: \(debugResponse)")
+                            
+                            if let errorMsg = debugResponse.error ?? debugResponse.message {
+                                throw NetworkError.serverError(errorMsg)
+                            }
+                        } catch {
+                            if error is NetworkError {
+                                throw error
+                            }
+                            print("⚠️ Could not decode error response: \(error)")
+                        }
+                    }
+                }
+                
+                // Handle HTTP status codes
                 switch httpResponse.statusCode {
                 case 200...299:
                     return data
@@ -571,9 +629,6 @@ class APIService {
                 case 404:
                     throw NetworkError.notFound
                 case 400...499:
-                    if let errorResponse = try? JSONDecoder.defaultDecoder.decode(APIError.self, from: data) {
-                        throw NetworkError.serverError(errorResponse.message)
-                    }
                     throw NetworkError.serverError("Client error: \(httpResponse.statusCode)")
                 case 500...599:
                     throw NetworkError.serverError("Server error: \(httpResponse.statusCode)")
@@ -581,84 +636,62 @@ class APIService {
                     throw NetworkError.unknown
                 }
             }
-            .tryMap { data in
-                return try JSONDecoder.defaultDecoder.decode(T.self, from: data)
-            }
-            .mapError { error in
-                return NetworkError.decodingFailed(error)
-            }
-            .eraseToAnyPublisher()
-    }
-}
-    
-
-    
-// Add JSONDecoder extension for consistent date formatting
-extension JSONDecoder {
-    static var defaultDecoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        
-        // Configure date decoding strategy to handle multiple formats
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSZ"
-        
-        // Define multiple date formats to try
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let dateString = try container.decode(String.self)
-            
-            // Try multiple date formats
-            let formats = [
-                "yyyy-MM-dd'T'HH:mm:ss.SSSZ",
-                "yyyy-MM-dd'T'HH:mm:ssZ",
-                "yyyy-MM-dd'T'HH:mm:ss",
-                "yyyy-MM-dd"
-            ]
-            
-            for format in formats {
-                dateFormatter.dateFormat = format
-                if let date = dateFormatter.date(from: dateString) {
-                    return date
+            .flatMap { data -> AnyPublisher<T, Error> in
+                // Try to print the raw JSON structure
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data),
+                   let jsonData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print("📊 JSON structure: \(jsonString)")
+                }
+                
+                // Try to decode debug response first for inspection
+                if let debugResponse = try? JSONDecoder().decode(MultipartDebugResponse.self, from: data) {
+                    print("🔍 Debug response successfully decoded: \(debugResponse)")
+                }
+                
+                do {
+                    // Use the default decoder with proper date strategy
+                    let decoder = JSONDecoder()
+                    decoder.dateDecodingStrategy = .iso8601
+                    
+                    let decodedObject = try decoder.decode(T.self, from: data)
+                    return Just(decodedObject)
+                        .setFailureType(to: Error.self)
+                        .eraseToAnyPublisher()
+                } catch {
+                    print("❌ Decoding error for type \(T.self): \(error)")
+                    
+                    // More detailed decoding error analysis
+                    if let decodingError = error as? DecodingError {
+                        switch decodingError {
+                        case .typeMismatch(let type, let context):
+                            print("Type mismatch: expected \(type) at path: \(context.codingPath)")
+                        case .valueNotFound(let type, let context):
+                            print("Value missing: expected \(type) at path: \(context.codingPath)")
+                        case .keyNotFound(let key, let context):
+                            print("Key not found: \(key) at path: \(context.codingPath)")
+                        case .dataCorrupted(let context):
+                            print("Data corrupted at path: \(context.codingPath), debug description: \(context.debugDescription)")
+                        @unknown default:
+                            print("Unknown decoding error: \(error)")
+                        }
+                    }
+                    
+                    return Fail(error: NetworkError.decodingFailed(error))
+                        .eraseToAnyPublisher()
                 }
             }
-            
-            // If none of the formats match, throw an error
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Cannot decode date string \(dateString)"
-            )
-        }
-        
-        return decoder
+            .mapError { error in
+                if let networkError = error as? NetworkError {
+                    return networkError
+                }
+                return NetworkError.decodingFailed(error)
+            }
+        .eraseToAnyPublisher()
     }
 }
 
-// API Error model for decoding error responses
-struct APIError: Codable, Error {
-    var message: String
-    var error: String?
-    
-    // Handle multiple error formats from the server
-    enum CodingKeys: String, CodingKey {
-        case message, error
-    }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // Try to decode error message with different field names
-        if let message = try? container.decode(String.self, forKey: .message) {
-            self.message = message
-        } else if let error = try? container.decode(String.self, forKey: .error) {
-            self.message = error
-            self.error = error
-        } else {
-            // Fallback for completely unknown format
-            self.message = "Unknown server error"
-            self.error = nil
-        }
-    }
-}
+
 
 // Protocol for types that can be created with an empty initializer
 protocol EmptyInitializable {
