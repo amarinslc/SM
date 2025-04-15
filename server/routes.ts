@@ -189,8 +189,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log("Profile update request received:");
-      console.log("Body:", req.body);
-      console.log("File:", req.file ? "✅ File present" : "❌ No file");
+      console.log("Headers:", req.headers['content-type'] || 'no content-type');
+      console.log("Body keys:", Object.keys(req.body));
+      console.log("File:", req.file ? `✅ File present (${req.file.mimetype}, ${req.file.size} bytes)` : "❌ No file");
       
       try {
         const updateData: Record<string, any> = {};
@@ -225,23 +226,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
         console.log("Processed update data:", updateData);
   
-        // Handle photo upload - strict Cloudinary-only approach
+        // Enhanced photo upload handling with better error handling and logging
         if (req.file) {
           try {
-            console.log("Processing file upload:", req.file.path);
-            // Upload to Cloudinary
+            console.log("Processing file upload:", {
+              path: req.file.path,
+              originalName: req.file.originalname,
+              size: req.file.size,
+              mimetype: req.file.mimetype
+            });
+
+            // Verify file exists
+            try {
+              await fs.access(req.file.path);
+              console.log(`✅ File exists at ${req.file.path}`);
+            } catch (err) {
+              console.error(`❌ File does not exist at ${req.file.path}:`, err);
+              return handleError(500, "Uploaded file could not be processed");
+            }
+            
+            // Determine resource type based on mimetype
+            const resourceType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
+            
+            // Upload to Cloudinary with proper resource type
             const result = await uploadToCloudinary(req.file.path, {
               folder: 'dgrs48tas/users',
+              resource_type: resourceType
             });
             
             // Use the Cloudinary secure URL for the photo
             updateData.photo = result.secure_url;
             
-            console.log(`Uploaded user photo to Cloudinary: ${result.secure_url}`);
+            console.log(`✅ Uploaded user photo to Cloudinary: ${result.secure_url}`);
           } catch (err) {
-            console.error('Cloudinary upload failed:', err);
-            // No fallback - return error to client as JSON
-            return handleError(500, "Failed to upload profile photo. Please try again later.");
+            console.error('❌ Cloudinary upload failed:', err);
+            // Provide detailed error information
+            return handleError(500, `Failed to upload profile photo: ${(err as Error).message}`);
           }
         }
   
