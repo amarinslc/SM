@@ -1318,7 +1318,11 @@ export class DatabaseStorage implements IStorage {
       
       for (const user of searchResults) {
         // Check privacy settings - only include users who share their email/phone or aren't private
-        const privacySettings = user.privacySettings || {};
+        // Parse the privacy settings using the schema to ensure we have proper defaults
+        const privacySettings: PrivacySettings = user.privacySettings ? 
+          privacySettingsSchema.parse(user.privacySettings) : 
+          privacySettingsSchema.parse({});
+          
         const includeUser = !user.isPrivate || 
                            (emails && emails.length > 0 && privacySettings.showEmail) || 
                            (phoneNumbers && phoneNumbers.length > 0 && privacySettings.showPhoneNumber);
