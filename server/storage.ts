@@ -1,7 +1,7 @@
 import session from "express-session";
-import { users, type User, type InsertUser, Post, Comment, comments, follows, posts, postReports, PrivacySettings, privacySettingsSchema, PostReport } from "@shared/schema";
+import { users, type User, type InsertUser, Post, Comment, comments, follows, posts, postReports, PrivacySettings, privacySettingsSchema, PostReport, SimpleUser } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, inArray, or, sql, gt, desc } from "drizzle-orm";
+import { eq, and, inArray, or, sql, gt, desc, like, ilike } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
 import { Resend } from 'resend';
@@ -31,6 +31,7 @@ export function sanitizeUser(user: User | undefined): SanitizedUser | undefined 
     name: user.name,
     bio: user.bio,
     photo: user.photo,
+    phoneNumber: user.phoneNumber,
     followerCount: user.followerCount,
     followingCount: user.followingCount,
     isPrivate: user.isPrivate,
@@ -115,6 +116,7 @@ export interface IStorage {
   // Special operations
   getFullUserData(id: number): Promise<Omit<User, 'password' | 'verificationToken' | 'resetPasswordToken' | 'resetPasswordExpires'> | undefined>;
   searchUsers(query: string): Promise<SanitizedUser[]>;
+  searchUsersByContacts(phoneNumbers?: string[], emails?: string[], viewerId?: number): Promise<SimpleUser[]>;
   getAllUsers(): Promise<SanitizedUser[]>;
   deleteUser(id: number): Promise<void>;
   getUserProfile(userId: number, viewerId?: number): Promise<UserProfileWithRelationship | undefined>;

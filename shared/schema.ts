@@ -9,6 +9,7 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   bio: text("bio"),
   photo: text("photo").default(""),
+  phoneNumber: text("phone_number").unique(), // Added phone number field with index for contact search
   followerCount: integer("follower_count").default(0),
   followingCount: integer("following_count").default(0),
   isPrivate: boolean("is_private").default(true),
@@ -20,6 +21,7 @@ export const users = pgTable("users", {
   removedPostCount: integer("removed_post_count").default(0), // Track number of posts removed for violations
   privacySettings: jsonb("privacy_settings").default({
     showEmail: false,
+    showPhoneNumber: false, // Added privacy setting for phone number
     allowTagging: true,
     allowDirectMessages: true,
     activityVisibility: "followers", // public, followers, none
@@ -81,6 +83,7 @@ export const insertUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   bio: z.string().optional(),
   photo: z.any().optional(),
+  phoneNumber: z.string().optional(),
   isPrivate: z.boolean().default(true),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -105,6 +108,7 @@ export const reportSchema = z.object({
 
 export const privacySettingsSchema = z.object({
   showEmail: z.boolean().default(false),
+  showPhoneNumber: z.boolean().default(false),
   allowTagging: z.boolean().default(true),
   allowDirectMessages: z.boolean().default(true),
   activityVisibility: z.enum(["public", "followers", "none"]).default("followers"),
@@ -121,6 +125,7 @@ export const privacySettingsSchema = z.object({
   })
 }).default({
   showEmail: false,
+  showPhoneNumber: false,
   allowTagging: true,
   allowDirectMessages: true,
   activityVisibility: "followers",
@@ -132,6 +137,24 @@ export const privacySettingsSchema = z.object({
   }
 });
 
+// Schema for contact search (used by iOS client)
+export const contactSearchSchema = z.object({
+  phoneNumbers: z.array(z.string()).optional(),
+  emails: z.array(z.string()).optional()
+});
+
+// Schema for simplified user data returned to clients
+export const simpleUserSchema = z.object({
+  id: z.number(),
+  username: z.string(),
+  name: z.string(),
+  photo: z.string().optional(),
+  isFollowing: z.boolean().optional(),
+  isPending: z.boolean().optional()
+});
+
+export type ContactSearch = z.infer<typeof contactSearchSchema>;
+export type SimpleUser = z.infer<typeof simpleUserSchema>;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Post = typeof posts.$inferSelect;
