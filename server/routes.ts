@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { users, follows } from "@shared/schema";
+import { users, follows, contactSearchSchema } from "@shared/schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
@@ -18,6 +18,7 @@ import {
   runFullVerification
 } from './file-verification';
 import { isAdmin } from './middlewares/admin-check';
+import { z } from 'zod';
 
 // Use ONLY Replit's persistent .data folder for file storage
 // This is critical for file persistence across deployments
@@ -109,6 +110,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Search error:", error);
       res.status(500).json({ 
         error: "Failed to search users",
+        details: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+  
+  // Contact search endpoint for iOS client
+  app.post("/api/users/contact-search", async (req, res) => {
+    try {
+      // Require authentication for this endpoint
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      // Validate request body using zod schema
+      const { phoneNumbers, emails } = contactSearchSchema.parse(req.body);
+      
+      // If no search criteria provided, return empty array
+      if ((!phoneNumbers || phoneNumbers.length === 0) && (!emails || emails.length === 0)) {
+        return res.json([]);
+      }
+      
+      // Get the matching users
+      const users = await storage.searchUsersByContacts(
+        phoneNumbers, 
+        emails, 
+        req.user!.id
+      );
+      
+      return res.json(users);
+    } catch (error) {
+      console.error("Contact search error:", error);
+      
+      // Handle validation errors specifically
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          error: "Invalid request data", 
+          details: error.format() 
+        });
+      }
+      
+      res.status(500).json({ 
+        error: "Failed to search contacts",
         details: error instanceof Error ? error.message : "Unknown error"
       });
     }

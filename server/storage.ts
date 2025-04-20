@@ -1267,6 +1267,107 @@ export class DatabaseStorage implements IStorage {
         .where(eq(users.id, id));
     });
   }
+  
+  /**
+   * Search for users by phone numbers and emails from contacts
+   * This method is used by the iOS client for contact matching
+   * It does not store the submitted contacts permanently
+   * 
+   * @param phoneNumbers Array of phone numbers to search for
+   * @param emails Array of email addresses to search for
+   * @param viewerId Optional ID of the user performing the search
+   * @returns Array of SimpleUser objects representing matching users
+   */
+  async searchUsersByContacts(phoneNumbers?: string[], emails?: string[], viewerId?: number): Promise<SimpleUser[]> {
+    try {
+      // If no search criteria provided, return empty array
+      if ((!phoneNumbers || phoneNumbers.length === 0) && (!emails || emails.length === 0)) {
+        return [];
+      }
+      
+      // Build search conditions
+      const conditions = [];
+      
+      // Add phone number search condition if phone numbers provided
+      if (phoneNumbers && phoneNumbers.length > 0) {
+        conditions.push(inArray(users.phoneNumber, phoneNumbers));
+      }
+      
+      // Add email search condition if emails provided
+      if (emails && emails.length > 0) {
+        conditions.push(inArray(users.email, emails));
+      }
+      
+      // Get users matching the conditions
+      const searchResults = await db
+        .select()
+        .from(users)
+        .where(
+          and(
+            or(...conditions),
+            // Exclude admin users from search results
+            sql`(${users.role} IS NULL OR ${users.role} != 'admin')`,
+            // Don't include the user who is searching
+            viewerId ? sql`${users.id} != ${viewerId}` : sql`1=1`
+          )
+        )
+        .limit(100); // Reasonable limit for contacts search
+      
+      // For each result, check if viewer is following them
+      const results: SimpleUser[] = [];
+      
+      for (const user of searchResults) {
+        // Check privacy settings - only include users who share their email/phone or aren't private
+        const privacySettings = user.privacySettings || {};
+        const includeUser = !user.isPrivate || 
+                           (emails && emails.length > 0 && privacySettings.showEmail) || 
+                           (phoneNumbers && phoneNumbers.length > 0 && privacySettings.showPhoneNumber);
+        
+        if (!includeUser) {
+          continue;
+        }
+        
+        // Get relationship status if viewerId is provided
+        let isFollowing = false;
+        let isPending = false;
+        
+        if (viewerId) {
+          // Check if viewer is following this user
+          const [followStatus] = await db
+            .select({
+              isPending: follows.isPending
+            })
+            .from(follows)
+            .where(
+              and(
+                eq(follows.followerId, viewerId),
+                eq(follows.followingId, user.id)
+              )
+            );
+          
+          if (followStatus) {
+            isFollowing = !followStatus.isPending;
+            isPending = !!followStatus.isPending;
+          }
+        }
+        
+        // Format as SimpleUser
+        results.push({
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          photo: user.photo || '',
+          isFollowing,
+          isPending
+        });
+      }
+      
+      return results;
+    } catch (error) {
+      console.error("Error searching users by contacts:", error);
+      return [];
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();
