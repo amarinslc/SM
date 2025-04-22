@@ -126,8 +126,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Validate request body using zod schema
       const { phoneNumbers, emails } = contactSearchSchema.parse(req.body);
       
+      // Enhanced debugging - log the search criteria
+      console.log("Contact search request received:");
+      console.log(`Phone numbers (${phoneNumbers?.length || 0}):`, phoneNumbers);
+      console.log(`Emails (${emails?.length || 0}):`, emails);
+      
       // If no search criteria provided, return empty array
       if ((!phoneNumbers || phoneNumbers.length === 0) && (!emails || emails.length === 0)) {
+        console.log("No search criteria provided, returning empty array");
         return res.json([]);
       }
       
@@ -137,6 +143,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         emails, 
         req.user!.id
       );
+      
+      console.log(`Contact search found ${users.length} matching users`);
       
       return res.json(users);
     } catch (error) {

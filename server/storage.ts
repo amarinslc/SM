@@ -1280,8 +1280,15 @@ export class DatabaseStorage implements IStorage {
    */
   async searchUsersByContacts(phoneNumbers?: string[], emails?: string[], viewerId?: number): Promise<SimpleUser[]> {
     try {
+      // Enhanced logging
+      console.log("🔍 searchUsersByContacts called with:");
+      console.log(`  - ${phoneNumbers?.length || 0} phone numbers`);
+      console.log(`  - ${emails?.length || 0} emails`);
+      console.log(`  - viewerId: ${viewerId || 'undefined'}`);
+      
       // If no search criteria provided, return empty array
       if ((!phoneNumbers || phoneNumbers.length === 0) && (!emails || emails.length === 0)) {
+        console.log("⚠️ No search criteria provided, returning empty array");
         return [];
       }
       
@@ -1290,13 +1297,45 @@ export class DatabaseStorage implements IStorage {
       
       // Add phone number search condition if phone numbers provided
       if (phoneNumbers && phoneNumbers.length > 0) {
+        console.log("Phone numbers to search:", JSON.stringify(phoneNumbers));
+        
+        // Format phone numbers to match database format and create OR conditions
+        // This adds flexibility in how phone numbers are formatted
+        const formattedPhoneNumbers = phoneNumbers.map(phone => {
+          // Strip all non-numeric characters
+          const numericOnly = phone.replace(/\D/g, '');
+          return numericOnly;
+        });
+        
+        console.log("Formatted phone numbers:", JSON.stringify(formattedPhoneNumbers));
+        
+        // Create conditions for different phone number formats:
+        // 1. Exact match
         conditions.push(inArray(users.phoneNumber, phoneNumbers));
+        
+        // 2. Strip + and country code if present
+        const strippedNumbers = phoneNumbers.map(phone => {
+          return phone.replace(/^\+/, '').replace(/^1/, '');
+        });
+        conditions.push(inArray(users.phoneNumber, strippedNumbers));
+        
+        // 3. Numeric only (no symbols)
+        conditions.push(inArray(users.phoneNumber, formattedPhoneNumbers));
       }
       
       // Add email search condition if emails provided
       if (emails && emails.length > 0) {
+        console.log("Emails to search:", JSON.stringify(emails));
         conditions.push(inArray(users.email, emails));
       }
+      
+      // Debugging: See what's in the database
+      const allUsers = await db
+        .select({ id: users.id, username: users.username, phoneNumber: users.phoneNumber, email: users.email })
+        .from(users);
+        
+      console.log(`Database has ${allUsers.length} total users`);
+      console.log("Sample user records:", JSON.stringify(allUsers.slice(0, 3)));
       
       // Get users matching the conditions
       const searchResults = await db
@@ -1312,6 +1351,17 @@ export class DatabaseStorage implements IStorage {
           )
         )
         .limit(100); // Reasonable limit for contacts search
+        
+      console.log(`Found ${searchResults.length} users matching contact search criteria`);
+      if (searchResults.length > 0) {
+        console.log("First match:", {
+          id: searchResults[0].id,
+          username: searchResults[0].username,
+          phoneNumber: searchResults[0].phoneNumber,
+          // Don't log full email for privacy
+          email: searchResults[0].email ? `${searchResults[0].email.substring(0, 3)}...` : null
+        });
+      }
       
       // For each result, check if viewer is following them
       const results: SimpleUser[] = [];
