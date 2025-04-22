@@ -1,4 +1,5 @@
 // AuthManager.swift
+
 import Foundation
 import Combine
 
@@ -20,25 +21,12 @@ class AuthManager: ObservableObject {
         checkAuthStatus()
     }
     
-    // Check if user is already authenticated with improved reliability
+    // Check if user is already authenticated
     func checkAuthStatus() {
         isLoading = true
         
-        // First make sure the server is awake
-        APIService.shared.wakeUpServerEnhanced(maxRetries: 3)
-            .receive(on: DispatchQueue.main)
-            .sink { serverReady in
-                if !serverReady {
-                    self.isLoading = false
-                    self.error = "Unable to connect to server. Please try again later."
-                    self.isAuthenticated = false
-                    return
-                }
-                
-                // Then check authentication status
-                self.getCurrentUser()
-            }
-            .store(in: &cancellables)
+        // Directly check authentication status
+        getCurrentUser()
     }
     
     // Separate method to get current user for better reusability
@@ -69,36 +57,17 @@ class AuthManager: ObservableObject {
                 // Convert from AuthResponse to User
                 self.currentUser = response.toUser()
                 self.isAuthenticated = true
-                print("User already logged in: \(response.user.username)")
-                
-                // Print authentication details for debugging
-                print("👤 User details - isFollowing: \(response.isFollowing), isPending: \(response.isPending)")
             }
             .store(in: &cancellables)
     }
     
-    // Login with improved error handling and server connection check
+    // Login with improved error handling
     func login(username: String, password: String, completion: @escaping (Bool) -> Void) {
         isLoading = true
         error = nil
         
-        // First make sure the server is awake before attempting login
-        APIService.shared.wakeUpServerEnhanced(maxRetries: 3)
-            .receive(on: DispatchQueue.main)
-            .sink { serverReady in
-                if !serverReady {
-                    self.isLoading = false
-                    self.error = "Unable to connect to server. Please try again later."
-                    DispatchQueue.main.async {
-                        completion(false)
-                    }
-                    return
-                }
-                
-                // Proceed with login
-                self.performLogin(username: username, password: password, completion: completion)
-            }
-            .store(in: &cancellables)
+        // Proceed with login directly
+        performLogin(username: username, password: password, completion: completion)
     }
     
     private func performLogin(username: String, password: String, completion: @escaping (Bool) -> Void) {
@@ -129,10 +98,9 @@ class AuthManager: ObservableObject {
                 self.isAuthenticated = true
                 
                 print("✅ Login successful for user: \(response.user.username)")
-                print("👤 User relationship - isFollowing: \(response.isFollowing), isPending: \(response.isPending)")
                 
                 // Verify that cookies were properly stored
-                if let baseURL = URL(string: "https://dbsocial.replit.app") {
+                if let baseURL = URL(string: "https://dunbarsocial.app/api") {
                     let cookies = HTTPCookieStorage.shared.cookies(for: baseURL) ?? []
                     if !cookies.isEmpty {
                         print("🍪 Cookies stored after login: \(cookies.count)")
@@ -148,13 +116,14 @@ class AuthManager: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // Register with improved error handling and server connection check
+    // Register with improved error handling - updated with phone number
     func register(
         username: String,
         email: String,
         password: String,
         confirmPassword: String,
         name: String,
+        phoneNumber: String, // Added phone number parameter
         bio: String?,
         isPrivate: Bool?,
         profileImage: Data?,
@@ -163,33 +132,19 @@ class AuthManager: ObservableObject {
         isLoading = true
         error = nil
         
-        // First make sure the server is awake before attempting registration
-        APIService.shared.wakeUpServerEnhanced(maxRetries: 3)
-            .receive(on: DispatchQueue.main)
-            .sink { serverReady in
-                if !serverReady {
-                    self.isLoading = false
-                    self.error = "Unable to connect to server. Please try again later."
-                    DispatchQueue.main.async {
-                        completion(false)
-                    }
-                    return
-                }
-                
-                // Proceed with registration
-                self.performRegistration(
-                    username: username,
-                    email: email,
-                    password: password,
-                    confirmPassword: confirmPassword,
-                    name: name,
-                    bio: bio,
-                    isPrivate: isPrivate,
-                    profileImage: profileImage,
-                    completion: completion
-                )
-            }
-            .store(in: &cancellables)
+        // Proceed with registration directly
+        performRegistration(
+            username: username,
+            email: email,
+            password: password,
+            confirmPassword: confirmPassword,
+            name: name,
+            phoneNumber: phoneNumber, // Added phone number parameter
+            bio: bio,
+            isPrivate: isPrivate,
+            profileImage: profileImage,
+            completion: completion
+        )
     }
     
     private func performRegistration(
@@ -198,6 +153,7 @@ class AuthManager: ObservableObject {
         password: String,
         confirmPassword: String,
         name: String,
+        phoneNumber: String, // Added phone number parameter
         bio: String?,
         isPrivate: Bool?,
         profileImage: Data?,
@@ -209,6 +165,7 @@ class AuthManager: ObservableObject {
             password: password,
             confirmPassword: confirmPassword,
             name: name,
+            phoneNumber: phoneNumber, // Added phone number parameter
             bio: bio,
             isPrivate: isPrivate,
             profileImage: profileImage
@@ -235,7 +192,6 @@ class AuthManager: ObservableObject {
             self.isAuthenticated = true
             
             print("✅ Registration successful for user: \(response.user.username)")
-            print("👤 User relationship - isFollowing: \(response.isFollowing), isPending: \(response.isPending)")
             
             DispatchQueue.main.async {
                 completion(true)

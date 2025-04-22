@@ -1,4 +1,6 @@
-// AuthAPI.swift
+
+
+// AuthAPI.swift with phone number support
 import Foundation
 import Combine
 
@@ -15,9 +17,9 @@ class AuthAPI {
         return apiService.request(endpoint: "/login", method: .post, parameters: parameters)
     }
     
-    // Register
+    // Register with phone number support
     func register(username: String, email: String, password: String, confirmPassword: String,
-                 name: String, bio: String?, isPrivate: Bool?, profileImage: Data?) -> AnyPublisher<AuthResponse, NetworkError> {
+                 name: String, phoneNumber: String, bio: String?, isPrivate: Bool?, profileImage: Data?) -> AnyPublisher<AuthResponse, NetworkError> {
         print("📝 Attempting to register user: \(username)")
         
         var parameters: [String: Any] = [
@@ -25,7 +27,8 @@ class AuthAPI {
             "email": email,
             "password": password,
             "confirmPassword": confirmPassword,
-            "name": name  
+            "name": name,
+            "phoneNumber": phoneNumber // Added phone number parameter
         ]
         
         if let bio = bio {
@@ -60,7 +63,6 @@ class AuthAPI {
     }
     
     // Logout
-    // In AuthAPI.swift
     func logout() -> AnyPublisher<EmptyResponse, NetworkError> {
         print("🚪 Logging out")
         return apiService.request(endpoint: "/logout", method: .post)
@@ -76,4 +78,3 @@ class AuthAPI {
 struct ServerInfo: Decodable {
     let status: String
 }
-
