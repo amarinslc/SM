@@ -106,7 +106,13 @@ class UserAPI {
 
     
     // Update user profile using the wrapper approach and PATCH method
-    func updateProfile(name: String, bio: String?, isPrivate: Bool, profileImage: Data?) -> AnyPublisher<User, NetworkError> {
+     func updateProfile(
+         name: String,
+         bio: String?,
+         isPrivate: Bool,
+         profileImage: Data?,
+         phoneNumber: String?      // ← new
+    ) -> AnyPublisher<User, NetworkError> {
         guard let currentUser = AuthManager.shared.currentUser else {
             return Fail(error: NetworkError.unauthorized).eraseToAnyPublisher()
         }
@@ -115,8 +121,11 @@ class UserAPI {
             "isPrivate": isPrivate
         ]
         if let bio = bio {
-            parameters["bio"] = bio
-        }
+                 parameters["bio"] = bio
+            }
+            if let phone = phoneNumber {
+                parameters["phoneNumber"] = phone
+             }
         
         // Use PATCH for profile update with image; explicitly use HTTPMethod.patch
         let publisher: AnyPublisher<ProfileUpdateResponseWrapper, NetworkError>
@@ -144,6 +153,7 @@ class UserAPI {
                     username: response.username,
                     displayName: response.name,   // API returns the display name in "name"
                     email: response.email,
+                    phoneNumber: response.phoneNumber,
                     bio: response.bio,
                     photo: response.photo,
                     followerCount: response.followerCount,
@@ -171,7 +181,8 @@ class UserAPI {
         let id: Int
         let username: String
         let email: String?
-        let name: String       // API returns "name" instead of "displayName"
+        let name: String // API returns "name" instead of "displayName"
+        let phoneNumber: String?
         let bio: String?
         let photo: String?
         let followerCount: Int
@@ -181,8 +192,15 @@ class UserAPI {
         let role: String?
         
         private enum CodingKeys: String, CodingKey {
-            case id, username, email, name, bio, photo, followerCount, followingCount, isPrivate, emailVerified, role
-        }
+               case id, username, email, name
+               case phoneNumber           // ← add this
+               case bio, photo,
+                    followerCount,
+                    followingCount,
+                    isPrivate,
+                    emailVerified,
+                    role
+           }
     }
 }
 
@@ -218,10 +236,44 @@ extension UserAPI {
         return apiService.request(endpoint: "/account/delete", method: .post, parameters: params)
     }
     
-    // Update Privacy Settings API call.
-    // PATCH /api/user/privacy-settings accepts any changes in the privacy settings fields.
+    /// Fetch the user's current privacy settings (including showPhoneNumber)
+    func getPrivacySettings() -> AnyPublisher<PrivacySettings, NetworkError> {
+        print("🔍 Fetching privacy settings from /user/privacy-settings")
+        return apiService
+            .request(endpoint: "/user/privacy-settings", method: .get)
+            .handleEvents(
+                receiveOutput: { settings in
+                    print("✅ Received privacy settings:", settings)
+                },
+                receiveCompletion: { completion in
+                    if case let .failure(err) = completion {
+                        print("❌ Error fetching privacy settings:", err.localizedDescription)
+                    }
+                }
+            )
+            .eraseToAnyPublisher()
+    }
+
+    /// Patch any changed privacy settings, including showPhoneNumber
     func updatePrivacySettings(settings: [String: Any]) -> AnyPublisher<PrivacySettings, NetworkError> {
-        return apiService.request(endpoint: "/user/privacy-settings", method: .patch, parameters: settings)
+        print("🔄 Patching privacy settings with payload:", settings)
+        return apiService
+            .request(
+                endpoint: "/user/privacy-settings",
+                method: .patch,
+                parameters: settings
+            )
+            .handleEvents(
+                receiveOutput: { updated in
+                    print("✅ Privacy settings updated to:", updated)
+                },
+                receiveCompletion: { completion in
+                    if case let .failure(err) = completion {
+                        print("❌ Error updating privacy settings:", err.localizedDescription)
+                    }
+                }
+            )
+            .eraseToAnyPublisher()
     }
 }
 
@@ -250,10 +302,19 @@ struct PrivacySettings: Codable {
     var showEmail: Bool
     var allowTagging: Bool
     var activityVisibility: String
+    var showPhoneNumber: Bool
     var notificationPreferences: NotificationPreferences
     // New keys added for user consent settings
     var privacyAgreement: Bool?
     var dataConsent: Bool?
+    
+    private enum CodingKeys: String, CodingKey {
+        case showEmail
+        case showPhoneNumber          // ← new
+        case allowTagging, activityVisibility,
+             notificationPreferences,
+             privacyAgreement, dataConsent
+    }
 }
 
 struct NotificationPreferences: Codable {

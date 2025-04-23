@@ -326,7 +326,7 @@ class APIService {
                         .setFailureType(to: NetworkError.self)
                         .eraseToAnyPublisher()
                 } catch {
-                    print("❌ Decoding error: \(error)")
+                    //print("❌ Decoding error: \(error)")
                     
                     // For small text responses that aren't JSON but we still want to accept
                     if let responseText = String(data: data, encoding: .utf8),
@@ -522,29 +522,42 @@ class APIService {
         imageData: [Data]? = nil,
         imageFieldName: String = "media"
     ) -> AnyPublisher<T, NetworkError> {
-        guard let url = URL(string: "\(baseURL)\(endpoint)") else {
-            return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+        // Special case for multipart upload for posts to prevent /api duplication
+        let fullURL: URL
+        if endpoint == "/posts" {
+            // Use the direct API path for posts to get: https://dunbarsocial.app/api/posts
+            let directPath = "https://dunbarsocial.app/api/posts"
+            guard let url = URL(string: directPath) else {
+                return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+            }
+            fullURL = url
+        } else {
+            // Regular case: use the baseURL, which is set to "https://dunbarsocial.app/api"
+            guard let url = URL(string: "\(baseURL)\(endpoint)") else {
+                return Fail(error: NetworkError.invalidURL).eraseToAnyPublisher()
+            }
+            fullURL = url
         }
         
-        print("📡 Making multipart request to: \(url.absoluteString)")
+        print("📡 Making multipart request to: \(fullURL.absoluteString)")
         
-        // Generate boundary string
+        // Generate a boundary string for multipart/form-data
         let boundary = "Boundary-\(UUID().uuidString)"
         
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: fullURL)
         request.httpMethod = method.rawValue
-        request.setValue("multipart/form-data; boundary=\(boundary)",
-                         forHTTPHeaderField: "Content-Type")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         
-        let cookies = HTTPCookieStorage.shared.cookies(for: url) ?? []
+        // Add cookies if available
+        let cookies = HTTPCookieStorage.shared.cookies(for: fullURL) ?? []
         if !cookies.isEmpty {
-            print("🍪 Adding cookies to multipart request: \(cookies)")
             let cookieHeaders = HTTPCookie.requestHeaderFields(with: cookies)
             for (field, value) in cookieHeaders {
                 request.addValue(value, forHTTPHeaderField: field)
             }
         }
         
+        // Build the multipart body
         var body = Data()
         
         // Append text parameters
@@ -557,177 +570,70 @@ class APIService {
         // Append image data if provided
         if let imageData = imageData {
             for (index, data) in imageData.enumerated() {
-                // Key fix: Use the same field name for all images (without array notation in name)
-                // This matches how FormData works in JavaScript and what multer expects
                 let filename = "image\(index).jpg"
                 body.append("--\(boundary)\r\n".data(using: .utf8)!)
-                // Just use the fieldName without any brackets - this is crucial
+                // Use the provided imageFieldName (it should match what the server expects – in this case, "media")
                 body.append("Content-Disposition: form-data; name=\"\(imageFieldName)\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
-                // Detect MIME type from the data if possible
-                let mimeType = detectMimeType(from: data) ?? "image/jpeg"
-                body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+                body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
                 body.append(data)
                 body.append("\r\n".data(using: .utf8)!)
             }
         }
         
-        // Close the multipart form data with boundary
+        // Close the multipart form
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
         
         print("📦 Total request body size: \(body.count) bytes")
         
-        
+        // Proceed with your usual network call logic for the multipart upload
         return NetworkManager.shared.session.dataTaskPublisher(for: request)
             .mapError { error -> NetworkError in
                 print("❌ Network error: \(error.localizedDescription)")
                 return NetworkError.requestFailed(error)
             }
-            .tryMap { data, response -> Data in
-                // Enhanced response logging
-                print("📲 Multipart response received:")
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NetworkError.invalidResponse
-                }
-                
-                print("🔢 Status code: \(httpResponse.statusCode)")
-                
-                // Save cookies
-                if let headerFields = httpResponse.allHeaderFields as? [String: String] {
-                    let cookies = HTTPCookie.cookies(withResponseHeaderFields: headerFields, for: url)
-                    if !cookies.isEmpty {
-                        HTTPCookieStorage.shared.setCookies(cookies, for: url, mainDocumentURL: nil)
-                    }
-                }
-                
-                // Log response body
-                if let responseString = String(data: data, encoding: .utf8) {
-                    print("📄 Response data: \(responseString)")
-                    
-                    // Try to decode as debug response for better error details
-                    if httpResponse.statusCode >= 400 {
-                        do {
-                            let debugResponse = try JSONDecoder().decode(MultipartDebugResponse.self, from: data)
-                            print("🐞 Debug decoded response: \(debugResponse)")
-                            
-                            if let errorMsg = debugResponse.error ?? debugResponse.message {
-                                throw NetworkError.serverError(errorMsg)
-                            }
-                        } catch {
-                            if error is NetworkError {
-                                throw error
-                            }
-                            print("⚠️ Could not decode error response: \(error)")
-                        }
-                    }
-                }
-                
-                // Handle HTTP status codes
-                switch httpResponse.statusCode {
-                case 200...299:
-                    return data
-                case 401:
-                    throw NetworkError.unauthorized
-                case 404:
-                    throw NetworkError.notFound
-                case 400...499:
-                    throw NetworkError.serverError("Client error: \(httpResponse.statusCode)")
-                case 500...599:
-                    throw NetworkError.serverError("Server error: \(httpResponse.statusCode)")
-                default:
-                    throw NetworkError.unknown
-                }
+            .tryMap { data, response in
+                // Additional response handling could be inserted here if needed.
+                return data
             }
             .flatMap { data -> AnyPublisher<T, Error> in
-                // Try to print the raw JSON structure
-                if let jsonObject = try? JSONSerialization.jsonObject(with: data),
-                   let jsonData = try? JSONSerialization.data(withJSONObject: jsonObject, options: .prettyPrinted),
-                   let jsonString = String(data: jsonData, encoding: .utf8) {
-                    print("📊 JSON structure: \(jsonString)")
-                }
-                
-                // Try to decode debug response first for inspection
-                if let debugResponse = try? JSONDecoder().decode(MultipartDebugResponse.self, from: data) {
-                    print("🔍 Debug response successfully decoded: \(debugResponse)")
-                }
-                
                 do {
-                    // Use the default decoder with proper date strategy
                     let decoder = JSONDecoder()
-                    decoder.dateDecodingStrategy = .iso8601
-                    
-                    let decodedObject = try decoder.decode(T.self, from: data)
-                    return Just(decodedObject)
+                    // Set up a custom ISO8601 formatter that can handle fractional seconds.
+                    let isoFormatter = ISO8601DateFormatter()
+                    isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    decoder.dateDecodingStrategy = .custom { decoder in
+                        let container = try decoder.singleValueContainer()
+                        let dateString = try container.decode(String.self)
+                        guard let date = isoFormatter.date(from: dateString) else {
+                            throw DecodingError.dataCorruptedError(
+                                in: container,
+                                debugDescription: "Date string does not match expected ISO8601 format with fractional seconds."
+                            )
+                        }
+                        return date
+                    }
+                    let decodedResult = try decoder.decode(T.self, from: data)
+                    return Just(decodedResult)
                         .setFailureType(to: Error.self)
                         .eraseToAnyPublisher()
                 } catch {
                     print("❌ Decoding error for type \(T.self): \(error)")
-                    
-                    // More detailed decoding error analysis
-                    if let decodingError = error as? DecodingError {
-                        switch decodingError {
-                        case .typeMismatch(let type, let context):
-                            print("Type mismatch: expected \(type) at path: \(context.codingPath)")
-                        case .valueNotFound(let type, let context):
-                            print("Value missing: expected \(type) at path: \(context.codingPath)")
-                        case .keyNotFound(let key, let context):
-                            print("Key not found: \(key) at path: \(context.codingPath)")
-                        case .dataCorrupted(let context):
-                            print("Data corrupted at path: \(context.codingPath), debug description: \(context.debugDescription)")
-                        @unknown default:
-                            print("Unknown decoding error: \(error)")
-                        }
-                    }
-                    
                     return Fail(error: NetworkError.decodingFailed(error))
                         .eraseToAnyPublisher()
                 }
             }
-            .mapError { error in
+            .mapError { error -> NetworkError in
                 if let networkError = error as? NetworkError {
                     return networkError
                 }
                 return NetworkError.decodingFailed(error)
             }
-        .eraseToAnyPublisher()
+            .eraseToAnyPublisher()
     }
 }
 
 
-
-// MIME type detection helper
-private func detectMimeType(from data: Data) -> String? {
-    // Simple magic number detection for common image formats
-    if data.count >= 2 {
-        let bytes = [UInt8](data.prefix(4))
-        
-        // JPEG signature: FF D8 FF
-        if bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF {
-            return "image/jpeg"
-        }
-        
-        // PNG signature: 89 50 4E 47
-        if bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 {
-            return "image/png"
-        }
-        
-        // GIF signature: 47 49 46 38
-        if bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x38 {
-            return "image/gif"
-        }
-        
-        // WebP signature: 52 49 46 46 and WEBP at offset 8
-        if data.count >= 12 && bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46 {
-            let webpBytes = [UInt8](data[8..<12])
-            if webpBytes[0] == 0x57 && webpBytes[1] == 0x45 && webpBytes[2] == 0x42 && webpBytes[3] == 0x50 {
-                return "image/webp"
-            }
-        }
-    }
-    
-    // Default to JPEG if unknown
-    return "image/jpeg"
-}
 
 // Protocol for types that can be created with an empty initializer
 protocol EmptyInitializable {
@@ -771,3 +677,60 @@ struct EmptyResponse: Codable, EmptyInitializable {
 }
     
 
+extension APIService {
+  func updatePhoneNumber(_ phoneNumber: String) -> AnyPublisher<ProfileUpdateResponseWrapper, NetworkError> {
+    let params = ["phoneNumber": phoneNumber]
+    return request(
+      endpoint: "/user/profile",
+      method: .patch,
+      parameters: params
+    )
+    .catch { error -> AnyPublisher<ProfileUpdateResponseWrapper, NetworkError> in
+      switch error {
+      case .serverError("No changes detected"), .decodingFailed:
+        // on either “no changes” or a decode failure, retry as multipart
+        return self.uploadMultipart(
+          endpoint: "/user/profile",
+          method: .patch,
+          parameters: params,
+          imageData: [],             // no actual photo
+          imageFieldName: "photo"
+        )
+      default:
+        return Fail(error: error).eraseToAnyPublisher()
+      }
+    }
+    .eraseToAnyPublisher()
+  }
+}
+
+// Response models
+struct ProfileUpdateResponseWrapper: Decodable {
+  let user: ProfileUpdateResponse
+  let success: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case user, success
+  }
+
+  init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    self.user = try c.decode(ProfileUpdateResponse.self, forKey: .user)
+    self.success = try c.decodeIfPresent(Bool.self, forKey: .success) ?? true
+  }
+}
+
+struct ProfileUpdateResponse: Decodable {
+  let id: Int
+  let username: String
+  let name: String
+  let email: String?
+  let phoneNumber: String?    // now populated properly
+  let bio: String?
+  let photo: String?
+  let followerCount: Int
+  let followingCount: Int
+  let isPrivate: Bool
+  let emailVerified: Bool?
+  let role: String?
+}

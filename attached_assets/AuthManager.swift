@@ -1,129 +1,145 @@
-// AuthManager.swift
-
+// AuthManager.swift :contentReference[oaicite:0]{index=0}&#8203;:contentReference[oaicite:1]{index=1}
 import Foundation
 import Combine
 
 // Auth Manager for handling authentication state
 class AuthManager: ObservableObject {
     static let shared = AuthManager()
-    
+
     // Published properties
     @Published var currentUser: User?
     @Published var isAuthenticated = false
     @Published var isLoading = false
     @Published var error: String?
-    
+
     // Store subscriptions
     private var cancellables = Set<AnyCancellable>()
-    
+
     private init() {
         // Check for existing session on launch
+        print("🔄 AuthManager init – checking auth status")
         checkAuthStatus()
     }
-    
-    // Check if user is already authenticated
+
+    // MARK: - Auth Status
+
     func checkAuthStatus() {
         isLoading = true
-        
-        // Directly check authentication status
+        print("🔍 Checking auth status")
         getCurrentUser()
     }
-    
-    // Separate method to get current user for better reusability
+
     private func getCurrentUser() {
         AuthAPI.shared.getCurrentUser()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completionStatus in
                 guard let self = self else { return }
                 self.isLoading = false
-                
+
                 switch completionStatus {
                 case .finished:
                     break
-                case .failure(let error):
-                    if case .unauthorized = error {
-                        // This is expected if not logged in - just set authenticated to false
+                case .failure(let err):
+                    if case .unauthorized = err {
+                        // Normal if not logged in
                         self.isAuthenticated = false
                         self.currentUser = nil
-                        print("Not logged in yet (this is normal)")
+                        print("ℹ️ Not logged in (expected)")
                     } else {
-                        // Other errors should still be reported
-                        self.error = error.localizedDescription
-                        print("Auth check error: \(error.localizedDescription)")
+                        self.error = err.localizedDescription
+                        print("❌ Auth check error:", err.localizedDescription)
                     }
                 }
             } receiveValue: { [weak self] response in
                 guard let self = self else { return }
-                // Convert from AuthResponse to User
                 self.currentUser = response.toUser()
                 self.isAuthenticated = true
+                print("✅ Authenticated as:", response.user.username)
             }
             .store(in: &cancellables)
     }
-    
-    // Login with improved error handling
+
+    // MARK: - Login
+
     func login(username: String, password: String, completion: @escaping (Bool) -> Void) {
         isLoading = true
         error = nil
-        
-        // Proceed with login directly
+        print("🔑 Logging in:", username)
         performLogin(username: username, password: password, completion: completion)
     }
-    
+
     private func performLogin(username: String, password: String, completion: @escaping (Bool) -> Void) {
         AuthAPI.shared.login(username: username, password: password)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completionStatus in
                 guard let self = self else { return }
                 self.isLoading = false
-                
+
                 switch completionStatus {
                 case .finished:
                     break
-                case .failure(let error):
-                    self.error = error.localizedDescription
+                case .failure(let err):
+                    self.error = err.localizedDescription
                     self.isAuthenticated = false
                     self.currentUser = nil
-                    
-                    print("❌ Login error: \(error.localizedDescription)")
-                    
-                    DispatchQueue.main.async {
-                        completion(false)
-                    }
+                    print("❌ Login error:", err.localizedDescription)
+                    DispatchQueue.main.async { completion(false) }
                 }
             } receiveValue: { [weak self] response in
                 guard let self = self else { return }
-                // Convert from AuthResponse to User
-                self.currentUser = response.toUser()
+                let basic = response.toUser()
+
+                UserAPI.shared.getUserProfile(userId: basic.id)
+                  .receive(on: DispatchQueue.main)
+                  .sink(
+                    receiveCompletion: { _ in },
+                    receiveValue: { prof in
+                      // Reconstruct a new User using prof for phoneNumber/etc.
+                      let full = User(
+                        id: basic.id,
+                        username: basic.username,
+                        displayName: prof.user.displayName,  // from full profile
+                        email: basic.email,
+                        phoneNumber: prof.user.phoneNumber,
+                        bio: prof.user.bio,
+                        photo: prof.user.photo,
+                        followerCount: basic.followerCount,
+                        followingCount: basic.followingCount,
+                        isPrivate: prof.user.isPrivate,
+                        emailVerified: basic.emailVerified,
+                        role: basic.role,
+                        isFollowing: basic.isFollowing,
+                        isPending: basic.isPending
+                      )
+
+                      self.currentUser = full
+                      self.isAuthenticated = true
+                      print("✅ Login + profile fetch successful:", full.username)
+                      DispatchQueue.main.async { completion(true) }
+                    }
+                  )
+                  .store(in: &cancellables)
                 self.isAuthenticated = true
-                
-                print("✅ Login successful for user: \(response.user.username)")
-                
-                // Verify that cookies were properly stored
+                print("✅ Login successful for:", response.user.username)
+                // Debug cookies
                 if let baseURL = URL(string: "https://dunbarsocial.app/api") {
                     let cookies = HTTPCookieStorage.shared.cookies(for: baseURL) ?? []
-                    if !cookies.isEmpty {
-                        print("🍪 Cookies stored after login: \(cookies.count)")
-                    } else {
-                        print("⚠️ No cookies found after login! This may cause session issues.")
-                    }
+                    print("🍪 Cookies after login:", cookies.count)
                 }
-                
-                DispatchQueue.main.async {
-                    completion(true)
-                }
+                DispatchQueue.main.async { completion(true) }
             }
             .store(in: &cancellables)
     }
-    
-    // Register with improved error handling - updated with phone number
+
+    // MARK: - Registration
+
     func register(
         username: String,
         email: String,
         password: String,
         confirmPassword: String,
         name: String,
-        phoneNumber: String, // Added phone number parameter
+        phoneNumber: String,
         bio: String?,
         isPrivate: Bool?,
         profileImage: Data?,
@@ -131,29 +147,28 @@ class AuthManager: ObservableObject {
     ) {
         isLoading = true
         error = nil
-        
-        // Proceed with registration directly
+        print("📝 Registering user:", username)
         performRegistration(
             username: username,
             email: email,
             password: password,
             confirmPassword: confirmPassword,
             name: name,
-            phoneNumber: phoneNumber, // Added phone number parameter
+            phoneNumber: phoneNumber,
             bio: bio,
             isPrivate: isPrivate,
             profileImage: profileImage,
             completion: completion
         )
     }
-    
+
     private func performRegistration(
         username: String,
         email: String,
         password: String,
         confirmPassword: String,
         name: String,
-        phoneNumber: String, // Added phone number parameter
+        phoneNumber: String,
         bio: String?,
         isPrivate: Bool?,
         profileImage: Data?,
@@ -165,7 +180,7 @@ class AuthManager: ObservableObject {
             password: password,
             confirmPassword: confirmPassword,
             name: name,
-            phoneNumber: phoneNumber, // Added phone number parameter
+            phoneNumber: phoneNumber,
             bio: bio,
             isPrivate: isPrivate,
             profileImage: profileImage
@@ -174,80 +189,81 @@ class AuthManager: ObservableObject {
         .sink { [weak self] completionStatus in
             guard let self = self else { return }
             self.isLoading = false
-            
+
             switch completionStatus {
             case .finished:
                 break
-            case .failure(let error):
-                self.error = error.localizedDescription
-                print("❌ Registration error: \(error.localizedDescription)")
-                DispatchQueue.main.async {
-                    completion(false)
-                }
+            case .failure(let err):
+                self.error = err.localizedDescription
+                print("❌ Registration error:", err.localizedDescription)
+                DispatchQueue.main.async { completion(false) }
             }
         } receiveValue: { [weak self] response in
             guard let self = self else { return }
-            // Convert from AuthResponse to User
             self.currentUser = response.toUser()
             self.isAuthenticated = true
-            
-            print("✅ Registration successful for user: \(response.user.username)")
-            
-            DispatchQueue.main.async {
-                completion(true)
-            }
+            print("✅ Registration successful for:", response.user.username)
+
+            // ── new: default showPhoneNumber = true ──
+            print("🔄 Defaulting showPhoneNumber → true")
+            UserAPI.shared
+                .updatePrivacySettings(settings: ["showPhoneNumber": true])
+                .receive(on: DispatchQueue.main)
+                .sink { comp in
+                    if case let .failure(err) = comp {
+                        print("❌ Failed default showPhoneNumber:", err.localizedDescription)
+                    }
+                } receiveValue: { newSettings in
+                    print("✅ showPhoneNumber is now:", newSettings.showPhoneNumber)
+                }
+                .store(in: &self.cancellables)
+
+            DispatchQueue.main.async { completion(true) }
         }
         .store(in: &cancellables)
     }
-    
-    // Logout with improved error handling
+
+    // MARK: - Logout
+
     func logout(completion: @escaping (Bool) -> Void) {
         isLoading = true
-        
+        print("🚪 Logging out")
         AuthAPI.shared.logout()
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completionStatus in
                 guard let self = self else { return }
                 self.isLoading = false
-                
+
                 switch completionStatus {
                 case .finished:
                     self.clearUserSession()
                     print("✅ Logout successful")
-                    DispatchQueue.main.async {
-                        completion(true)
-                    }
-                case .failure(let error):
-                    print("⚠️ Logout had server error: \(error.localizedDescription) - still clearing local session")
-                    // Even if the server logout fails, we'll clear local state
+                    DispatchQueue.main.async { completion(true) }
+                case .failure(let err):
+                    print("⚠️ Logout error (clearing anyway):", err.localizedDescription)
                     self.clearUserSession()
-                    DispatchQueue.main.async {
-                        completion(true)
-                    }
+                    DispatchQueue.main.async { completion(true) }
                 }
-            } receiveValue: { _ in
-                // We don't need to capture self here since we're not using it
-                // The value is ignored as we handle everything in completion
-            }
+            } receiveValue: { _ in }
             .store(in: &cancellables)
     }
-    
-    // Update current user
+
+    // MARK: - Helpers
+
     func updateCurrentUser(_ user: User) {
+        print("🔄 Updating current user in AuthManager: \(user.username)")
+        print("📱 Phone number in update: \(user.phoneNumber ?? "nil")")
+        
+        // Set the current user to the new user
         self.currentUser = user
     }
-    
-    // Clear user session
     private func clearUserSession() {
-        self.currentUser = nil
-        self.isAuthenticated = false
-        
-        // Clear cookies for complete logout
+        print("🔄 Clearing session & cookies")
+        currentUser = nil
+        isAuthenticated = false
         if let cookies = HTTPCookieStorage.shared.cookies {
-            print("🍪 Clearing \(cookies.count) cookies from session")
-            for cookie in cookies {
-                HTTPCookieStorage.shared.deleteCookie(cookie)
-            }
+            print("🍪 Deleting \(cookies.count) cookies")
+            cookies.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         }
     }
 }
