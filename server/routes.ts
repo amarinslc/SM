@@ -261,6 +261,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.bio = req.body.bio.trim();
         }
   
+        // Handle phoneNumber field with support for different formats
+        if (req.body.phoneNumber !== undefined) {
+          updateData.phoneNumber = req.body.phoneNumber.trim();
+          console.log(`📱 Phone number update requested: '${updateData.phoneNumber}'`);
+        } else if (req.body.phone_number !== undefined) {
+          updateData.phoneNumber = req.body.phone_number.trim();
+          console.log(`📱 Phone number update requested (snake_case): '${updateData.phoneNumber}'`);
+        }
+  
         // Handle isPrivate field if present (support both formats)
         if (req.body.isPrivate !== undefined) {
           const isPrivateValue = req.body.isPrivate;
