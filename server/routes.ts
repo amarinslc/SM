@@ -329,6 +329,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (Object.keys(updateData).length === 0) {
           return handleError(400, "No changes detected");
         }
+        
+        console.log("User ID for update:", req.user!.id);
+        console.log("Current user data:", req.user); // This shows current state before update
   
         const updatedUser = await storage.updateUser(req.user!.id, updateData);
         

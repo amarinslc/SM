@@ -619,6 +619,20 @@ export class DatabaseStorage implements IStorage {
       throw new Error('No data provided for update');
     }
 
+    // Get current user data to compare for changes
+    const currentUser = await this.getUser(id);
+    if (!currentUser) {
+      throw new Error('User not found');
+    }
+
+    // Log the current user's phone number state
+    console.log('Current phone number:', currentUser.phoneNumber);
+    
+    // Special handling for phone number updates from null
+    if (data.phoneNumber !== undefined) {
+      console.log(`Updating phone number from '${currentUser.phoneNumber}' to '${data.phoneNumber}'`);
+    }
+
     // Remove any undefined values
     const updateData = Object.fromEntries(
       Object.entries(data).filter(([_, value]) => value !== undefined)
